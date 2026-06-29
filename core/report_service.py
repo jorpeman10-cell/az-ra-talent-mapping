@@ -76,7 +76,14 @@ class ReportService:
         validation = DataValidator(brand_config).validate(record["data"])
         record["validation"] = validation.to_dict()
         self._save_record(record)
-        return self._response_for(record)
+        # 返回包含 data 字段的完整响应，供前端填充表单
+        return {
+            "report_id": report_id,
+            "data": record["data"],
+            "validation": record["validation"],
+            "status": record["status"],
+            "missing_information": record["validation"].get("missing_items", []),
+        }
 
     def render_report(self, report_id: str) -> dict[str, Any]:
         record = self._load_record(report_id)

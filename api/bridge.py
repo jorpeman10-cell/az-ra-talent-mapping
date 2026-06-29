@@ -326,7 +326,15 @@ def create_app(
     @app.post("/api/v1/reports/{report_id}/comments")
     def generate_comments(report_id: str, payload: CommentsRequest) -> dict[str, Any]:
         try:
-            return service.generate_comments(report_id, feedback=payload.feedback)
+            result = service.generate_comments(report_id, feedback=payload.feedback)
+            # 返回完整的数据结构，包含 report_id 和 data 字段
+            return {
+                "report_id": report_id,
+                "data": result.get("data", {}),
+                "validation": result.get("validation", {}),
+                "status": result.get("status", "draft"),
+                "missing_information": result.get("missing_information", []),
+            }
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail="Report not found") from exc
 

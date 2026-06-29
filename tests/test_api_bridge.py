@@ -153,14 +153,24 @@ class ApiBridgeTests(unittest.TestCase):
             card_response = client.get(f"/cards/reports/{report_id}")
             self.assertEqual(card_response.status_code, 200)
             self.assertIn("Alice", card_response.text)
-            self.assertIn(f'action="../../api/v1/reports/{report_id}/render"', card_response.text)
+            self.assertIn('id="ai-generate-btn"', card_response.text)
+            self.assertIn(f'action="render"', card_response.text)
 
             comments_response = client.post(f"/api/v1/reports/{report_id}/comments", json={})
             self.assertEqual(comments_response.status_code, 200)
+            comments_payload = comments_response.json()
+            self.assertIn("recommendation_rationale", comments_payload["data"])
 
             render_response = client.post(f"/api/v1/reports/{report_id}/render")
             self.assertEqual(render_response.status_code, 200)
             self.assertTrue(render_response.json()["filename"].endswith(".docx"))
+
+            browser_render_response = client.post(
+                f"/cards/reports/{report_id}/render",
+                follow_redirects=False,
+            )
+            self.assertEqual(browser_render_response.status_code, 303)
+            self.assertIn("/downloads/", browser_render_response.headers["location"])
 
 
 if __name__ == "__main__":
