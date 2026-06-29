@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Report Review Card</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Microsoft YaHei", sans-serif; background: #f6f8fa; color: #24292f; }
+    main { max-width: 920px; margin: 0 auto; padding: 24px; }
+    header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; border-bottom: 1px solid #d0d7de; padding-bottom: 16px; }
+    h1 { font-size: 22px; margin: 0 0 6px; }
+    h2 { font-size: 15px; margin: 20px 0 10px; }
+    .status { border: 1px solid #d0d7de; border-radius: 8px; padding: 8px 12px; background: #fff; font-size: 13px; }
+    .grid { display: grid; grid-template-columns: 260px 1fr; gap: 18px; margin-top: 18px; }
+    .panel { background: #fff; border: 1px solid #d0d7de; border-radius: 8px; padding: 16px; }
+    .label { color: #57606a; font-size: 12px; margin-top: 10px; }
+    .value { font-weight: 600; margin-top: 3px; }
+    textarea { width: 100%; min-height: 92px; box-sizing: border-box; border: 1px solid #d0d7de; border-radius: 6px; padding: 10px; font: inherit; }
+    .missing { color: #9a6700; font-size: 13px; line-height: 1.5; }
+    .actions { margin-top: 18px; display: flex; gap: 10px; }
+    button, a.button { border: 1px solid #1f883d; background: #1f883d; color: #fff; border-radius: 6px; padding: 9px 12px; text-decoration: none; font-size: 14px; }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } header { flex-direction: column; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>{{ data.get("candidate_name", "Candidate") }}</h1>
+      <div>{{ data.get("position_title", "Target Position") }}</div>
+    </div>
+    <div class="status">Status: {{ report.get("status", "draft") }}</div>
+  </header>
+
+  <section class="grid">
+    <aside class="panel">
+      <h2>Draft Fields</h2>
+      <div class="label">Brand</div>
+      <div class="value">{{ report.get("brand_id", "default") }}</div>
+      <div class="label">Current Company</div>
+      <div class="value">{{ data.get("current_company", "-") }}</div>
+      <div class="label">Current Title</div>
+      <div class="value">{{ data.get("current_title", "-") }}</div>
+      <h2>Missing Information</h2>
+      {% for item in validation.get("missing_items", []) %}
+        <div class="missing">{{ item.get("field") }}: {{ item.get("message") }}</div>
+      {% else %}
+        <div class="missing">No required field gaps.</div>
+      {% endfor %}
+    </aside>
+    <section class="panel">
+      <h2>Recommendation Rationale</h2>
+      {% set rationale = data.get("recommendation_rationale", {}) %}
+      <div class="label">Strengths Summary</div>
+      <textarea>{{ rationale.get("strengths_summary", "") }}</textarea>
+      <div class="label">Risk Notes</div>
+      <textarea>{{ rationale.get("risk_notes", "") }}</textarea>
+      <div class="label">Motivation</div>
+      <textarea>{{ data.get("motivation", "") }}</textarea>
+      <div class="label">Role Fit</div>
+      <textarea>{{ data.get("role_fit", "") }}</textarea>
+      <div class="actions">
+        <form method="post" action="../../api/v1/reports/{{ report.get("report_id") }}/render">
+          <button type="submit">Generate DOCX</button>
+        </form>
+      </div>
+    </section>
+  </section>
+</main>
+</body>
+</html>

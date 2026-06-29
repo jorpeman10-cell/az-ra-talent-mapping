@@ -1,0 +1,27 @@
+inherits: "default"
+brand_id: "az"
+brand_name: "AstraZeneca Referral Report"
+version: "1.0.0"
+description: "AstraZeneca-flavored candidate referral report configuration."
+
+branding:
+  primary_color: "#830051"
+  secondary_color: "#00A3E0"
+
+comment_style:
+  tone: "precise"
+  length: "medium"
+  language: "zh-en"
+  focus_areas:
+    - "scientific depth"
+    - "cross-functional influence"
+    - "China healthcare market fit"
+
+prompt_rules:
+  must_follow:
+    - "Use only uploaded resume, uploaded JD, and consultant-provided context."
+    - "Highlight evidence relevant to AstraZeneca or the named client company."
+    - "Call out missing information explicitly."
+
+export:
+  filename_template: "az_{candidate_name}_report_{date}"

@@ -1,0 +1,94 @@
+brand_id: "default"
+brand_name: "Generic Referral Report"
+version: "1.0.0"
+description: "Default generic candidate referral report configuration."
+
+branding:
+  primary_color: "#1F6FEB"
+  secondary_color: "#2DA44E"
+  font_family: "Microsoft YaHei"
+  font_family_en: "Arial"
+
+fields:
+  required:
+    - field: "candidate_name"
+      group: "candidate"
+      label: "Candidate Name"
+      type: "string"
+      required: true
+    - field: "position_title"
+      group: "position"
+      label: "Position Title"
+      type: "string"
+      required: true
+    - field: "recommendation_rationale"
+      group: "assessment"
+      label: "Recommendation Rationale"
+      type: "structured_text"
+      required: true
+      sub_fields:
+        - field: "strengths_summary"
+          label: "Strengths Summary"
+          required: true
+        - field: "risk_notes"
+          label: "Risk Notes"
+          required: false
+  optional:
+    - field: "current_title"
+      group: "candidate"
+      label: "Current Title"
+      type: "string"
+    - field: "current_company"
+      group: "candidate"
+      label: "Current Company"
+      type: "string"
+    - field: "client_company"
+      group: "client"
+      label: "Client Company"
+      type: "string"
+    - field: "location"
+      group: "position"
+      label: "Location"
+      type: "string"
+    - field: "job_description"
+      group: "position"
+      label: "Job Description"
+      type: "text"
+    - field: "original_resume"
+      group: "resume"
+      label: "Original Resume"
+      type: "text"
+  hidden: []
+
+comment_style:
+  tone: "professional"
+  length: "medium"
+  language: "zh-en"
+  focus_areas:
+    - "role fit"
+    - "motivation"
+    - "career trajectory"
+
+compliance:
+  disclaimer:
+    enabled: true
+    text: "Draft report for consultant review."
+  privacy_rules:
+    - name: "id_card"
+      pattern: "\\b\\d{17}[\\dXx]\\b"
+      replacement: "[REDACTED_ID]"
+
+template_mapping:
+  use_client_template: false
+
+prompt_rules:
+  system_role: "You are a professional executive search consultant drafting a candidate referral report."
+  must_follow:
+    - "Use only the provided resume, job, and consultant context."
+    - "Call out missing information explicitly."
+  prohibited:
+    - "Do not invent unverifiable facts."
+
+export:
+  default_format: "docx"
+  filename_template: "{brand_id}_{candidate_name}_report_{date}"

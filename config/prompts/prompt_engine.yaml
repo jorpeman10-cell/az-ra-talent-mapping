@@ -1,0 +1,46 @@
+variables:
+  - name: "brand_name"
+    source: "brand_config.brand_name"
+    default_value: "Generic Referral Report"
+  - name: "system_role"
+    source: "brand_config.prompt_rules.system_role"
+    default_value: "You are a professional executive search consultant."
+  - name: "resume_text"
+    source: "user_input.resume_text"
+    default_value: ""
+  - name: "position_title"
+    source: "user_input.position_title"
+    default_value: ""
+  - name: "job_description"
+    source: "user_input.job_description"
+    default_value: ""
+
+templates:
+  - template_id: "generate_draft_comments"
+    system_prompt: |
+      {{ system_role }}
+      Write in a concise, professional, consultant-ready style for {{ brand_name }}.
+    user_prompt: |
+      Position: {{ position_title }}
+
+      Job Description:
+      {{ job_description }}
+
+      Resume:
+      {{ resume_text }}
+
+      Return JSON with comments.recommendation_rationale.strengths_summary,
+      comments.recommendation_rationale.risk_notes, comments.motivation,
+      comments.role_fit, and missing_information.
+    output_schema:
+      type: "object"
+      properties:
+        comments:
+          type: "object"
+        missing_information:
+          type: "array"
+
+output_format:
+  json_parsing:
+    allow_markdown_wrapper: true
+    attempt_repair: true

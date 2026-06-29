@@ -1,0 +1,28 @@
+{
+  "report_id": "report_f87a8a588c7c4b438dd4dd3a0a8cbcab",
+  "brand_id": "default",
+  "status": "draft",
+  "created_at": "2026-06-29T05:24:02.213473+00:00",
+  "updated_at": "2026-06-29T05:24:02.213473+00:00",
+  "data": {
+    "brand_id": "default",
+    "candidate_name": "Test Candidate 8810",
+    "position_title": "Senior Consultant",
+    "resume_text": "Experienced consultant with healthcare project delivery experience.",
+    "resume_file_name": "",
+    "job_description": "Deliver client projects and manage stakeholders.",
+    "source_context": {},
+    "original_resume": "Experienced consultant with healthcare project delivery experience."
+  },
+  "validation": {
+    "is_valid": false,
+    "missing_items": [
+      {
+        "field": "recommendation_rationale",
+        "message": "请补充 Recommendation Rationale。",
+        "severity": "error"
+      }
+    ],
+    "warnings": []
+  }
+}

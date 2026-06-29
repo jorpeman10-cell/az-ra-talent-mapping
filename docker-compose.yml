@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  generic-report-tool:
+    build: .
+    image: ${GENERIC_REPORT_IMAGE:-generic-report-tool:latest}
+    container_name: hiijob-generic-report-tool
+    ports:
+      - "127.0.0.1:8810:8810"
+    volumes:
+      - generic_report_data:/app/data
+      - ./config:/app/config:ro
+      - ./templates:/app/templates:ro
+    environment:
+      - GENERIC_REPORT_CONFIG_DIR=/app/config
+      - GENERIC_REPORT_TEMPLATE_DIR=/app/templates
+      - GENERIC_REPORT_DATA_DIR=/app/data
+      - GENERIC_REPORT_BRIDGE_TOKEN=${BRIDGE_TOKEN:-}
+      - GENERIC_REPORT_PUBLIC_BASE_URL=${GENERIC_REPORT_PUBLIC_BASE_URL:-http://localhost:8810}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8810/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  generic_report_data:
