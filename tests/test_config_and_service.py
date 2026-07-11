@@ -356,6 +356,8 @@ class ConfigAndServiceTests(unittest.TestCase):
         )
 
         self.assertNotIn("T-STAR Burgundy", html_text)
+        self.assertRegex(html_text, r'<div class="logo-card"><img[^>]+></div>')
+        self.assertNotRegex(html_text, r'<div class="logo-card">.*?<span>')
         self.assertEqual(html_text.count("20K*12 with annual bonus"), 1)
         self.assertIn("candidate-profile-layout no-photo", html_text)
         self.assertNotIn('<div class="professional-photo-placeholder"', html_text)
