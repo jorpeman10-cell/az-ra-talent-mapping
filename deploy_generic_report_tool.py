@@ -20,6 +20,7 @@ SSH_KEY = Path(r"C:\Users\EDY\.ssh\Hiijob.pem")
 PUBLIC_BASE_URL = "https://lobe.hiijob.cn/generic-report-tool"
 
 EXCLUDE_DIRS = {
+    ".git",
     "__pycache__",
     ".pytest_cache",
     ".mypy_cache",
@@ -27,7 +28,9 @@ EXCLUDE_DIRS = {
     ".venv",
     "data",
     "docs",
+    "output",
     "tests",
+    "tmp",
 }
 EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".log"}
 
@@ -116,6 +119,7 @@ def install_nginx(client: paramiko.SSHClient) -> None:
 
     snippet = """
     location ^~ /generic-report-tool/ {
+        client_max_body_size 100m;
         proxy_pass http://127.0.0.1:8810/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -144,7 +148,16 @@ if marker not in block:
     snippet = bytes.fromhex({encoded!r}).decode()
     p.write_text(s[:insert] + snippet + s[insert:])
 else:
-    print("nginx route already present in active lobe.hiijob.cn server block")
+    route_start = s.find(marker, start, end)
+    route_end = s.find("\\n    location ", route_start + len(marker), end)
+    if route_end < 0:
+        route_end = end
+    route = s[route_start:route_end]
+    if "client_max_body_size" not in route:
+        insert = s.find("\\n", route_start) + 1
+        p.write_text(s[:insert] + "        client_max_body_size 100m;\\n" + s[insert:])
+    else:
+        print("nginx route already has client_max_body_size")
 """
     encoded_installer = installer.encode("utf-8").hex()
     command = (

@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Report Review Card</title>
+  <title>Report Review Card / 报告审核卡片</title>
   <style>
     body { margin: 0; font-family: Arial, "Microsoft YaHei", sans-serif; background: #f6f8fa; color: #24292f; }
-    main { max-width: 920px; margin: 0 auto; padding: 24px; }
+    main { max-width: 980px; margin: 0 auto; padding: 24px; }
     header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; border-bottom: 1px solid #d0d7de; padding-bottom: 16px; }
     h1 { font-size: 22px; margin: 0 0 6px; }
     h2 { font-size: 15px; margin: 20px 0 10px; }
@@ -17,9 +17,13 @@
     .value { font-weight: 600; margin-top: 3px; }
     textarea { width: 100%; min-height: 92px; box-sizing: border-box; border: 1px solid #d0d7de; border-radius: 6px; padding: 10px; font: inherit; }
     .missing { color: #9a6700; font-size: 13px; line-height: 1.5; }
+    .quality { font-size: 13px; line-height: 1.5; padding: 8px 10px; border-radius: 6px; border: 1px solid #d0d7de; background: #fff; }
+    .quality-ok { color: #1f883d; border-color: #aceebb; background: #f0fff4; }
+    .quality-low_confidence { color: #9a6700; border-color: #f0c36d; background: #fff8c5; }
+    .quality-needs_ocr { color: #cf222e; border-color: #ffb3ba; background: #fff1f3; }
     .actions { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
-    button, a.button { border: 1px solid #1f883d; background: #1f883d; color: #fff; border-radius: 6px; padding: 9px 12px; text-decoration: none; font-size: 14px; cursor: pointer; }
-    button:disabled, a.button:disabled { opacity: .5; cursor: wait; }
+    button { border: 1px solid #1f883d; background: #1f883d; color: #fff; border-radius: 6px; padding: 9px 12px; text-decoration: none; font-size: 14px; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: wait; }
     .ai-btn { border-color: #155eef; background: #155eef; }
     .ai-status { color: #57606a; font-size: 13px; margin-top: 8px; }
     @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } header { flex-direction: column; } }
@@ -32,43 +36,73 @@
       <h1>{{ data.get("candidate_name", "Candidate") }}</h1>
       <div>{{ data.get("position_title", "Target Position") }}</div>
     </div>
-    <div class="status">Status: <span id="status-text">{{ report.get("status", "draft") }}</span></div>
+    <div class="status">Status / 状态: <span id="status-text">{{ report.get("status", "draft") }}</span></div>
   </header>
 
   <section class="grid">
     <aside class="panel">
-      <h2>Draft Fields</h2>
-      <div class="label">Brand</div>
+      <h2>Draft Fields / 草稿字段</h2>
+      <div class="label">Brand / 品牌</div>
       <div class="value">{{ report.get("brand_id", "default") }}</div>
-      <div class="label">Current Company</div>
+      <div class="label">Report Style / 报告风格</div>
+      <div class="value">{{ data.get("report_style", "tstar_warm") }}</div>
+      <div class="label">Current Company / 当前公司</div>
       <div class="value">{{ data.get("current_company", "-") }}</div>
-      <div class="label">Current Title</div>
+      <div class="label">Current Title / 当前职位</div>
       <div class="value">{{ data.get("current_title", "-") }}</div>
-      <h2>Missing Information</h2>
+      <div class="label">Salary Information / 薪资信息</div>
+      <div class="value">{{ data.get("salary_info", "-") }}</div>
+      {% set resume_quality = data.get("resume_quality", {}) %}
+      {% set quality_status = resume_quality.get("status", "unknown") %}
+      <h2>Resume Parse Quality / 简历解析质量</h2>
+      <div class="quality quality-{{ quality_status }}">
+        Status: {{ quality_status }}<br>
+        {% if resume_quality.get("reasons") %}
+          Reasons: {{ ", ".join(resume_quality.get("reasons", [])) }}<br>
+        {% endif %}
+        {% if resume_quality.get("needs_ocr") %}
+          Action: OCR or upload a text-selectable PDF/DOCX before final export.
+        {% elif quality_status == "low_confidence" %}
+          Action: Review extracted work history before final export.
+        {% else %}
+          Action: No parser warning.
+        {% endif %}
+      </div>
+      <h2>Missing Information / 缺失信息</h2>
       {% for item in validation.get("missing_items", []) %}
         <div class="missing">{{ item.get("field") }}: {{ item.get("message") }}</div>
       {% else %}
-        <div class="missing">No required field gaps.</div>
+        <div class="missing">No required field gaps. / 必填信息已完整。</div>
       {% endfor %}
+      <h2>DOCX Template Diagnostics / DOCX 模板诊断</h2>
+      <div class="label">Mode / 模式</div>
+      <div class="value">{{ template_diagnostics.get("docx_mode", "-") }}</div>
+      <div class="label">Reference Templates / 参考模板</div>
+      <div class="missing">
+        ZH: {{ template_diagnostics.get("reference_templates", {}).get("zh", "-") }}<br>
+        EN: {{ template_diagnostics.get("reference_templates", {}).get("en", "-") }}<br>
+        {{ template_diagnostics.get("message", "") }}
+      </div>
     </aside>
     <section class="panel">
-      <h2>Recommendation Rationale</h2>
+      <h2>Recommendation Rationale / 推荐理由</h2>
       {% set rationale = data.get("recommendation_rationale", {}) %}
-      <div class="label">Strengths Summary</div>
+      <div class="label">Strengths Summary / 优势摘要</div>
       <textarea id="strengths-summary">{{ rationale.get("strengths_summary", "") }}</textarea>
-      <div class="label">Risk Notes</div>
+      <div class="label">Risk Notes / 风险提示</div>
       <textarea id="risk-notes">{{ rationale.get("risk_notes", "") }}</textarea>
-      <div class="label">Motivation</div>
+      <div class="label">Motivation / 动机</div>
       <textarea id="motivation">{{ data.get("motivation", "") }}</textarea>
-      <div class="label">Role Fit</div>
+      <div class="label">Role Fit / 岗位匹配</div>
       <textarea id="role-fit">{{ data.get("role_fit", "") }}</textarea>
-      
+
       <div class="actions">
-        <button type="button" class="ai-btn" id="ai-generate-btn" onclick="generateAIComments()">
-          🤖 AI 生成评语
-        </button>
-        <form method="post" action="../../api/v1/reports/{{ report.get("report_id") }}/render" onsubmit="return beforeRender()">
-          <button type="submit">Generate DOCX</button>
+        <button type="button" class="ai-btn" id="ai-generate-btn" onclick="generateAIComments()">AI Generate Comments / AI 生成评语</button>
+        <form method="post" action="../../cards/reports/{{ report.get("report_id") }}/render" onsubmit="return beforeRender(event)">
+          <button type="submit">Generate DOCX / 生成 DOCX</button>
+        </form>
+        <form method="post" action="../../cards/reports/{{ report.get("report_id") }}/render-html" onsubmit="return beforeRender(event)">
+          <button type="submit">Generate HTML / 生成 HTML</button>
         </form>
       </div>
       <div class="ai-status" id="ai-status"></div>
@@ -78,28 +112,26 @@
 
 <script>
   const reportId = "{{ report.get('report_id', '') }}";
-  
+
   async function generateAIComments() {
     const btn = document.getElementById('ai-generate-btn');
     const status = document.getElementById('ai-status');
     btn.disabled = true;
-    status.textContent = '正在调用 AI 生成评语...';
-    
+    status.textContent = 'Calling AI to generate comments... / 正在调用 AI 生成评语...';
+
     try {
       const response = await fetch(`../../api/v1/reports/${reportId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ feedback: '' })
       });
-      
+
       if (!response.ok) {
         const error = await response.text();
         throw new Error(error);
       }
-      
+
       const result = await response.json();
-      
-      // 填充 AI 生成的评语到表单
       if (result.data && result.data.recommendation_rationale) {
         const rationale = result.data.recommendation_rationale;
         document.getElementById('strengths-summary').value = rationale.strengths_summary || '';
@@ -111,25 +143,61 @@
       if (result.data && result.data.role_fit) {
         document.getElementById('role-fit').value = result.data.role_fit || '';
       }
-      
-      status.textContent = '✓ AI 评语已生成，请审核后生成 DOCX';
-      
-      // 更新状态显示
+
+      status.textContent = 'AI comments generated. Please review before export. / AI 评语已生成，请审核后再导出。';
       if (result.validation && result.validation.is_valid) {
         document.getElementById('status-text').textContent = 'draft (AI filled)';
       }
     } catch (error) {
-      status.textContent = 'AI 生成失败: ' + error.message;
+      status.textContent = 'AI generation failed / AI 生成失败: ' + error.message;
       console.error('AI generation error:', error);
     } finally {
       btn.disabled = false;
     }
   }
-  
-  function beforeRender() {
-    // 在提交生成 DOCX 前，可以在这里添加保存逻辑
-    // 目前先简单确认
-    return true;
+
+  function reviewFieldsPayload() {
+    return {
+      motivation: document.getElementById('motivation').value,
+      role_fit: document.getElementById('role-fit').value,
+      recommendation_rationale: {
+        strengths_summary: document.getElementById('strengths-summary').value,
+        risk_notes: document.getElementById('risk-notes').value
+      }
+    };
+  }
+
+  async function saveReviewFields() {
+    const response = await fetch(`../../api/v1/reports/${reportId}/update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ known_fields: reviewFieldsPayload() })
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+  }
+
+  function beforeRender(event) {
+    if (event.target.dataset.saved === '1') {
+      return true;
+    }
+    event.preventDefault();
+    const status = document.getElementById('ai-status');
+    const button = event.submitter || event.target.querySelector('button[type="submit"]');
+    if (button) button.disabled = true;
+    status.textContent = 'Saving review fields... / 正在保存审核字段...';
+    saveReviewFields()
+      .then(() => {
+        status.textContent = 'Saved. Generating report... / 已保存，正在生成报告...';
+        event.target.dataset.saved = '1';
+        event.target.submit();
+      })
+      .catch((error) => {
+        status.textContent = 'Save failed / 保存失败: ' + error.message;
+        if (button) button.disabled = false;
+      });
+    return false;
   }
 </script>
 </body>

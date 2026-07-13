@@ -1,0 +1,102 @@
+{
+  "report_id": "report_7d2df8ee09894b96b1e60d16d0e61ab9",
+  "brand_id": "tstar",
+  "status": "confirmed",
+  "created_at": "2026-06-30T02:39:41.191046+00:00",
+  "updated_at": "2026-06-30T02:39:44.494584+00:00",
+  "data": {
+    "brand_id": "tstar",
+    "candidate_name": "Demo Candidate",
+    "position_title": "Medical Director",
+    "client_company": "Demo Client",
+    "resume_text": "个人信息\n姓名：Demo Candidate\n工作经历\n2020.06 - 至今\n阿斯利康医药（杭州）有限公司\n保留率在65%以上。\nFULL_ORIGINAL_RESUME_TAIL_MARKER",
+    "job_description": "负责医学策略、区域团队管理与核心医院准入。",
+    "report_style": "tstar_warm",
+    "original_resume": "个人信息\n姓名：Demo Candidate\n工作经历\n2020.06 - 至今\n阿斯利康医药（杭州）有限公司\n保留率在65%以上。\nFULL_ORIGINAL_RESUME_TAIL_MARKER",
+    "parsed_resume": {
+      "text": "个人信息\n姓名：Demo Candidate\n工作经历\n2020.06 - 至今\n阿斯利康医药（杭州）有限公司\n保留率在65%以上。\nFULL_ORIGINAL_RESUME_TAIL_MARKER",
+      "lines": [
+        "个人信息",
+        "姓名：Demo Candidate",
+        "工作经历",
+        "2020.06 - 至今",
+        "阿斯利康医药（杭州）有限公司",
+        "保留率在65%以上。",
+        "FULL_ORIGINAL_RESUME_TAIL_MARKER"
+      ],
+      "evidence": [
+        "保留率在65%以上。",
+        "阿斯利康医药（杭州）有限公司",
+        "个人信息",
+        "姓名：Demo Candidate",
+        "工作经历",
+        "2020.06 - 至今",
+        "FULL_ORIGINAL_RESUME_TAIL_MARKER"
+      ],
+      "structured": {
+        "experience_items": [
+          "2020.06 - 至今 阿斯利康医药（杭州）有限公司 保留率在65%以上。 FULL_ORIGINAL_RESUME_TAIL_MARKER",
+          "工作经历",
+          "2020.06 - 至今"
+        ],
+        "achievement_items": [
+          "保留率在65%以上。"
+        ],
+        "keyword_items": [
+          "阿斯利康医药（杭州）有限公司"
+        ],
+        "risk_items": [],
+        "sections": {
+          "personal": [
+            "姓名：Demo Candidate"
+          ],
+          "experience": [
+            "2020.06 - 至今",
+            "阿斯利康医药（杭州）有限公司",
+            "保留率在65%以上。",
+            "FULL_ORIGINAL_RESUME_TAIL_MARKER"
+          ]
+        },
+        "section_titles": {
+          "personal": "Personal Information / 个人信息",
+          "intention": "Career Intention / 求职意向",
+          "summary": "Profile / 自我评价",
+          "experience": "Work Experience / 工作经历",
+          "projects": "Project Experience / 项目经历",
+          "skills": "Skills / 核心技能",
+          "education": "Education / 教育经历",
+          "certificates": "Certificates / 荣誉证书",
+          "unclassified": "Parsed Resume / 简历原文"
+        }
+      },
+      "line_count": 7,
+      "char_count": 99
+    },
+    "recommendation_rationale": {
+      "strengths_summary": "EN: Demo Candidate shows initial relevance for Medical Director based on resume evidence: 保留率在65%以上。; 阿斯利康医药（杭州）有限公司; 个人信息. The comparison point from the JD is: 负责医学策略、区域团队管理与核心医院准入。. CN: 基于简历证据，该候选人与目标岗位存在初步匹配；需要重点对照 JD 中的职责、业务场景和客户要求进行复核。",
+      "risk_notes": "EN: Please verify whether the achievements are directly transferable to the client context, and confirm motivation, compensation expectations, availability, reporting line preference, and any non-compete constraints. CN: 建议顾问继续确认业绩真实性、与客户岗位的可迁移性、候选人动机、薪酬期望、到岗时间、汇报线偏好及竞业限制。"
+    },
+    "motivation": "EN: Motivation still needs consultant validation through interview notes. CN: 候选人动机目前需要顾问通过沟通记录进一步补充，例如换岗原因、目标平台偏好和长期职业诉求。",
+    "role_fit": "EN: Initial role fit for Medical Director is supported when the resume evidence aligns with the JD priorities above; final recommendation should depend on consultant validation and client-specific must-haves. CN: 对 Medical Director 的岗位匹配需要结合简历中的项目/业绩证据与 JD 要求判断，尤其是医学策略、跨部门协作、业务影响和客户硬性条件。"
+  },
+  "validation": {
+    "is_valid": true,
+    "missing_items": [],
+    "warnings": []
+  },
+  "ai_missing_information": [
+    {
+      "field": "consultant_notes",
+      "message": "Add verified interview notes or call summary."
+    }
+  ],
+  "output": {
+    "filename": "tstar_Demo_Candidate_report_20260630_103941.docx"
+  },
+  "output_html": {
+    "filename": "tstar_Demo_Candidate_report_20260630_103941.html"
+  },
+  "output_pdf": {
+    "filename": "tstar_Demo_Candidate_report_20260630_103941.pdf"
+  }
+}

@@ -1,0 +1,40 @@
+inherits: "default"
+brand_id: "tstar"
+brand_name: "T-STAR 泰伦仕 Candidate Referral Report"
+version: "1.0.0"
+description: "T-STAR branded candidate referral report configuration."
+
+branding:
+  primary_color: "#F7B500"
+  secondary_color: "#111111"
+  accent_color: "#2F5597"
+  font_family: "Microsoft YaHei"
+  font_family_en: "Microsoft YaHei"
+  font_size: 10.5
+
+comment_style:
+  tone: "board-ready"
+  length: "medium"
+  language: "zh-en"
+  focus_areas:
+    - "candidate profile"
+    - "resume evidence"
+    - "role fit"
+    - "evidence-based recommendation"
+    - "risk notes"
+
+prompt_rules:
+  must_follow:
+    - "Use only uploaded resume, uploaded JD, and consultant-provided context."
+    - "Write comments in a concise consultant style suitable for client review."
+    - "Keep recommendation rationale evidence-based and easy to scan."
+    - "Call out missing information explicitly."
+
+template_mapping:
+  use_client_template: false
+  reference_templates:
+    zh: "tstar/resume_template_zh.docx"
+    en: "tstar/resume_template_en.docx"
+
+export:
+  filename_template: "tstar_{candidate_name}_report_{date}"
