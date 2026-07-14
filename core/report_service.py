@@ -340,8 +340,13 @@ class ReportService:
         self,
         resume_source_id: str,
         known_fields: dict[str, Any] | None = None,
+        require_publishable: bool = True,
     ) -> dict[str, Any]:
-        return self.brief_store.create_candidate_brief(resume_source_id, known_fields=known_fields)
+        return self.brief_store.create_candidate_brief(
+            resume_source_id,
+            known_fields=known_fields,
+            require_publishable=require_publishable,
+        )
 
     def get_candidate_brief(self, candidate_brief_id: str) -> dict[str, Any]:
         return self.brief_store.load_candidate_brief(candidate_brief_id)
@@ -389,7 +394,11 @@ class ReportService:
         source = self.brief_store.create_resume_source(resume_source, metadata=metadata)
         data["resume_source_id"] = source["resume_source_id"]
         known_fields = self._brief_known_fields(data)
-        brief = self.brief_store.create_candidate_brief(source["resume_source_id"], known_fields=known_fields)
+        brief = self.brief_store.create_candidate_brief(
+            source["resume_source_id"],
+            known_fields=known_fields,
+            require_publishable=False,
+        )
         data["candidate_brief_id"] = brief["candidate_brief_id"]
         data["candidate_brief"] = brief
         data["original_resume"] = source.get("text", resume_source)

@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from core.candidate_brief import ResumeQualityError
 from core.report_service import ReportService
 from core.parser import extract_uploaded_text
 
@@ -414,6 +415,8 @@ def create_app(
                 "resume_source_id": brief["resume_source_id"],
                 "candidate_brief": brief,
             }
+        except ResumeQualityError as exc:
+            raise HTTPException(status_code=422, detail=exc.to_detail()) from exc
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 

@@ -16,6 +16,20 @@ CANDIDATE_BRIEF_RE = re.compile(r"^cb_[a-f0-9]{32}$")
 SCHEMA_VERSION = "2026-07-10.1"
 
 
+class ResumeQualityError(ValueError):
+    def __init__(self, quality: dict[str, Any]) -> None:
+        super().__init__("Resume text quality is insufficient for candidate brief generation")
+        self.quality = quality
+
+    def to_detail(self) -> dict[str, Any]:
+        return {
+            "code": "resume_quality_blocked",
+            "message": str(self),
+            "quality": self.quality,
+            "next_action": "upload_text_resume_or_run_ocr",
+        }
+
+
 class CandidateBriefStore:
     def __init__(self, data_dir: str | Path) -> None:
         self.data_dir = Path(data_dir)
@@ -58,14 +72,20 @@ class CandidateBriefStore:
         self,
         resume_source_id: str,
         known_fields: dict[str, Any] | None = None,
+        require_publishable: bool = False,
     ) -> dict[str, Any]:
         source = self.load_resume_source(resume_source_id)
         fields = _compact_dict(known_fields or {})
+        resume_text = str(source.get("text") or "")
+        parsed = parse_resume_for_report(resume_text)
+        if require_publishable:
+            _ensure_publishable_resume(parsed)
         stable_payload = json.dumps(
             {
                 "resume_source_id": resume_source_id,
                 "known_fields": fields,
                 "schema_version": SCHEMA_VERSION,
+                "quality_gate": "publishable" if require_publishable else "draft",
             },
             ensure_ascii=False,
             sort_keys=True,
@@ -75,8 +95,6 @@ class CandidateBriefStore:
         if path.exists():
             return json.loads(path.read_text(encoding="utf-8"))
 
-        resume_text = str(source.get("text") or "")
-        parsed = parse_resume_for_report(resume_text)
         context_data = {
             **fields,
             "original_resume": resume_text,
@@ -113,6 +131,8 @@ class CandidateBriefStore:
             "metadata": {
                 "source_file_name": source.get("metadata", {}).get("file_name", ""),
                 "resume_char_count": source.get("char_count", 0),
+                "resume_quality": parsed.get("quality", {}),
+                "quality_gate": "publishable" if require_publishable else "draft",
                 "created_at": datetime.now(UTC).isoformat(),
             },
         }
@@ -134,6 +154,15 @@ class CandidateBriefStore:
         if not CANDIDATE_BRIEF_RE.match(str(brief_id or "")):
             raise ValueError("Invalid candidate_brief_id")
         return self.candidate_briefs_dir / f"{brief_id}.json"
+
+
+def _ensure_publishable_resume(parsed: dict[str, Any]) -> None:
+    quality = parsed.get("quality") if isinstance(parsed.get("quality"), dict) else {}
+    status = str(quality.get("status") or "")
+    if status != "ok":
+        if not quality:
+            quality = {"status": "low_confidence", "reasons": ["missing_quality_assessment"]}
+        raise ResumeQualityError(quality)
 
 
 def _compact_dict(values: dict[str, Any]) -> dict[str, Any]:

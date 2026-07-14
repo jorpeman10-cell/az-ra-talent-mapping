@@ -188,7 +188,8 @@ class ApiBridgeTests(unittest.TestCase):
                 "Phone: 13800138000",
                 "Email: alice@example.com",
                 "Professional Experience",
-                "2024.01-present AstraZeneca KAM",
+                "AstraZeneca China",
+                "2024.01-present Key Account Manager",
                 "Led key account access work with measurable growth.",
                 "FULL_REFERENCE_FLOW_MARKER",
             ])
@@ -235,7 +236,8 @@ class ApiBridgeTests(unittest.TestCase):
                 "Phone: 13800138000",
                 "Email: alice@example.com",
                 "Professional Experience",
-                "2024.01-present AstraZeneca KAM",
+                "AstraZeneca China",
+                "2024.01-present Key Account Manager",
                 "Led key account access work with measurable growth.",
                 "FULL_REFERENCE_ONLY_MARKER",
             ])
@@ -268,6 +270,36 @@ class ApiBridgeTests(unittest.TestCase):
             self.assertEqual(payload["data"]["client_company"], "Novartis")
             self.assertEqual(payload["data"]["salary_info"], "12K*12 + 20%")
             self.assertIn("FULL_REFERENCE_ONLY_MARKER", payload["data"]["original_resume"])
+
+    def test_candidate_brief_rejects_low_quality_resume_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = create_app(config_dir=PROJECT_ROOT / "config", data_dir=Path(tmp), public_base_url="http://testserver")
+            client = TestClient(app)
+
+            source_response = client.post("/api/v1/resume-sources", json={
+                "text": " ".join([
+                    "Alice has strong communication skills and excellent stakeholder management capability.",
+                    "She is collaborative, resilient, detail oriented, and interested in customer-facing work.",
+                    "This text intentionally has no company, role, or employment period evidence.",
+                ]),
+                "file_name": "low-quality.txt",
+            })
+            self.assertEqual(source_response.status_code, 200, source_response.text)
+
+            brief_response = client.post("/api/v1/candidate-briefs", json={
+                "resume_source_id": source_response.json()["resume_source_id"],
+                "known_fields": {
+                    "candidate_name": "Alice",
+                    "position_title": "KAM",
+                },
+            })
+
+            self.assertEqual(brief_response.status_code, 422)
+            detail = brief_response.json()["detail"]
+            self.assertEqual(detail["code"], "resume_quality_blocked")
+            self.assertEqual(detail["quality"]["status"], "low_confidence")
+            self.assertIn("missing_work_or_project_signal", detail["quality"]["reasons"])
+            self.assertEqual(detail["next_action"], "upload_text_resume_or_run_ocr")
 
     def test_draft_from_files_extracts_docx_xml_text_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:
