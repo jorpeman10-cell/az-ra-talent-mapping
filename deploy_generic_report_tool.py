@@ -10,7 +10,8 @@ import paramiko
 
 ROOT = Path(__file__).resolve().parent
 REMOTE_DIR = "/root/generic-report-tool"
-NETWORK = "host"
+NETWORK = "lobehubaliyundeploy_lobe-network"
+NETWORK_ALIAS = "generic-report-tool"
 CONTAINER = "hiijob-generic-report-tool"
 IMAGE = "generic-report-tool:latest"
 SSH_HOST = "139.129.192.85"
@@ -176,7 +177,14 @@ def deploy() -> None:
         upload(client)
         run(client, f"cd {REMOTE_DIR} && docker build -t {IMAGE} .")
         run(client, f"docker rm -f {CONTAINER} 2>/dev/null || true", check=False)
-        network_args = "--network host" if NETWORK == "host" else f"--network {NETWORK} -p 127.0.0.1:8810:8810"
+        if NETWORK == "host":
+            network_args = "--network host"
+        else:
+            network_args = (
+                f"--network {NETWORK} "
+                f"--network-alias {NETWORK_ALIAS} "
+                "-p 127.0.0.1:8810:8810"
+            )
         run(
             client,
             "docker run -d "
