@@ -127,6 +127,7 @@ class ReportService:
     def render_report(self, report_id: str) -> dict[str, Any]:
         record = self._load_record(report_id)
         self._refresh_parsed_resume(record)
+        self._ensure_renderable_resume_quality(record)
         brand_config = self.loader.load_brand(record["brand_id"])
         data = DataValidator(brand_config).prepare_draft_payload(record["data"])
         filename = self._filename(brand_config, data, "docx")
@@ -226,6 +227,7 @@ class ReportService:
     def render_html_report(self, report_id: str) -> dict[str, Any]:
         record = self._load_record(report_id)
         self._refresh_parsed_resume(record)
+        self._ensure_renderable_resume_quality(record)
         brand_config = self.loader.load_brand(record["brand_id"])
         data = DataValidator(brand_config).prepare_draft_payload(record["data"])
         filename = self._filename(brand_config, data, "html")
@@ -244,6 +246,7 @@ class ReportService:
     def render_pdf_report(self, report_id: str) -> dict[str, Any]:
         record = self._load_record(report_id)
         self._refresh_parsed_resume(record)
+        self._ensure_renderable_resume_quality(record)
         brand_config = self.loader.load_brand(record["brand_id"])
         data = DataValidator(brand_config).prepare_draft_payload(record["data"])
         filename = self._filename(brand_config, data, "pdf")
@@ -332,6 +335,21 @@ class ReportService:
         parsed = parse_resume_for_report(str(resume_source or ""))
         data["parsed_resume"] = parsed
         data["resume_quality"] = parsed.get("quality", {})
+
+    def _ensure_renderable_resume_quality(self, record: dict[str, Any]) -> None:
+        data = record.get("data", {})
+        if not (data.get("resume_source_id") or data.get("candidate_brief_id") or data.get("original_resume") or data.get("resume_text")):
+            return
+        quality = data.get("resume_quality")
+        if not isinstance(quality, dict):
+            parsed = data.get("parsed_resume") if isinstance(data.get("parsed_resume"), dict) else {}
+            quality = parsed.get("quality") if isinstance(parsed.get("quality"), dict) else {}
+        reasons = [str(item) for item in quality.get("reasons", [])] if isinstance(quality, dict) else []
+        if "short_resume_summary" in reasons:
+            raise ValueError(
+                "Resume source looks like an agent summary, not the full resume. "
+                "Please upload or pass the complete parsed resume text before rendering."
+            )
 
     def create_resume_source(self, text: str, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
         return self.brief_store.create_resume_source(text, metadata=metadata)

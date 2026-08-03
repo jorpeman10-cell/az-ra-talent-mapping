@@ -301,6 +301,41 @@ class ApiBridgeTests(unittest.TestCase):
             self.assertIn("missing_work_or_project_signal", detail["quality"]["reasons"])
             self.assertEqual(detail["next_action"], "upload_text_resume_or_run_ocr")
 
+    def test_render_rejects_agent_summarized_resume_with_422(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = create_app(config_dir=PROJECT_ROOT / "config", data_dir=Path(tmp), public_base_url="http://testserver")
+            client = TestClient(app)
+            summarized_resume = "\n".join([
+                "姓名：唐旭",
+                "电话：13732237830",
+                "邮箱：2294338095@qq.com",
+                "工作经历：",
+                "2026.01-2026.06 康盟医药&贝达医药&辉瑞 - DSM",
+                "负责浙江省核心市场，负责核心医院管理",
+                "2022.7-2022.12 欧加隆&默沙东 - SPS",
+                "负责浙江省核心市场，Top Sales",
+                "2018.07-2022.12 辉瑞&雅培",
+                "2018.7-2020.6 MR；2020.7-2022.6 SMR",
+                "负责ZOK产品核心市场销售",
+            ])
+            draft_response = client.post("/api/v1/reports/draft", json={
+                "brand_id": "tstar",
+                "candidate_name": "唐旭",
+                "position_title": "KAM",
+                "resume_text": summarized_resume,
+                "known_fields": {
+                    "client_company": "阿斯利康",
+                },
+            })
+            self.assertEqual(draft_response.status_code, 200, draft_response.text)
+            self.assertIn("short_resume_summary", draft_response.json()["data"]["resume_quality"]["reasons"])
+
+            report_id = draft_response.json()["report_id"]
+            render_response = client.post(f"/api/v1/reports/{report_id}/render")
+
+            self.assertEqual(render_response.status_code, 422)
+            self.assertIn("agent summary", render_response.json()["detail"])
+
     def test_draft_from_files_extracts_docx_xml_text_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:
             app = create_app(config_dir=PROJECT_ROOT / "config", data_dir=Path(tmp), public_base_url="http://testserver")

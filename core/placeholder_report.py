@@ -130,7 +130,7 @@ def build_placeholder_context(data: dict[str, Any], brand_config: dict[str, Any]
         ),
         "work_experience_items": resume_work_experience_from_data(data, limit=8),
         "appendix_blocks": appendix_blocks,
-        "appendix_resume": _ordered_resume_text(appendix_blocks, original_resume),
+        "appendix_resume": _full_original_resume_text(original_resume, appendix_blocks),
         "original_resume": original_resume,
         "placeholder_manifest": {
             "{{brand_name}}": "brand_name",
@@ -1390,6 +1390,13 @@ def _ordered_resume_text(blocks: dict[str, Any], original_resume: str) -> str:
         ordered.append("")
     value = "\n".join(ordered).strip()
     return value or blocks["fallback"] or original_resume
+
+
+def _full_original_resume_text(original_resume: str, blocks: dict[str, Any]) -> str:
+    value = str(original_resume or "").strip()
+    if value:
+        return value
+    return blocks.get("fallback") or _ordered_resume_text(blocks, original_resume)
 
 
 def _clean_items(items: list[str], limit: int) -> list[str]:

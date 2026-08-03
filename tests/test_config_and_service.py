@@ -105,6 +105,47 @@ class ConfigAndServiceTests(unittest.TestCase):
             self.assertEqual(quality["status"], "needs_ocr")
             self.assertTrue(quality["needs_ocr"])
 
+    def test_report_service_blocks_agent_summarized_resume_render(self):
+        from core.report_service import ReportService
+
+        summarized_resume = "\n".join([
+            "姓名：唐旭",
+            "电话：13732237830",
+            "邮箱：2294338095@qq.com",
+            "性别：男",
+            "当前所在地：杭州",
+            "目标城市：杭州",
+            "",
+            "工作经历：",
+            "2026.01-2026.06 康盟医药&贝达医药&辉瑞 - DSM",
+            "负责浙江省核心市场，负责核心医院管理",
+            "2022.7-2022.12 欧加隆&默沙东 - SPS",
+            "负责浙江省核心市场，Top Sales",
+            "2018.07-2022.12 辉瑞&雅培",
+            "2018.7-2020.6 MR；2020.7-2022.6 SMR",
+            "负责ZOK产品核心市场销售",
+        ])
+        with tempfile.TemporaryDirectory() as tmp:
+            service = ReportService(
+                config_dir=PROJECT_ROOT / "config",
+                data_dir=Path(tmp),
+                public_base_url="http://testserver",
+            )
+            draft = service.create_draft({
+                "brand_id": "tstar",
+                "candidate_name": "唐旭",
+                "position_title": "KAM",
+                "client_company": "阿斯利康",
+                "resume_text": summarized_resume,
+            })
+
+            quality = draft["data"].get("resume_quality", {})
+            self.assertEqual(quality["status"], "low_confidence")
+            self.assertIn("short_resume_summary", quality["reasons"])
+
+            with self.assertRaisesRegex(ValueError, "Resume source looks like an agent summary"):
+                service.render_report(draft["report_id"])
+
     def test_report_service_materializes_resume_source_and_candidate_brief(self):
         from core.report_service import ReportService
 
@@ -562,6 +603,41 @@ class ConfigAndServiceTests(unittest.TestCase):
         self.assertNotIn("yangjm625", experience_text)
         self.assertNotIn("浙江工业大学", experience_text)
 
+    def test_tstar_appendix_uses_full_original_resume_not_reordered_parse(self):
+        from core.placeholder_report import build_placeholder_context
+
+        resume = "\n".join([
+            "personal resume",
+            "Name: He Chaoren",
+            "Work Experience",
+            "2018.07-2022.12 AstraZeneca CVRM SPS",
+            "Promoted ZOK and achieved Top Sales.",
+            "2023.01-2024.07 RAW_ONLY_2023_01_2024_07_MARKER",
+            "This line is intentionally absent from parsed_resume.",
+            "Education",
+            "Zhejiang Chinese Medical University",
+        ])
+        data = {
+            "brand_id": "tstar",
+            "candidate_name": "He Chaoren",
+            "position_title": "RPM",
+            "original_resume": resume,
+            "parsed_resume": {
+                "text": "short parsed summary",
+                "structured": {
+                    "sections": {
+                        "experience": ["2018.07-2022.12 AstraZeneca CVRM SPS"],
+                    },
+                    "experience_items": ["2018.07-2022.12 AstraZeneca CVRM SPS"],
+                },
+            },
+        }
+
+        ctx = build_placeholder_context(data, {"brand_id": "tstar"})
+
+        self.assertEqual(ctx["appendix_resume"], resume)
+        self.assertIn("RAW_ONLY_2023_01_2024_07_MARKER", ctx["appendix_resume"])
+
     def test_resume_parser_splits_spaced_personal_labels(self):
         from core.resume_parser import parse_resume_for_report
         from core.placeholder_report import build_placeholder_context
@@ -593,6 +669,38 @@ class ConfigAndServiceTests(unittest.TestCase):
         self.assertEqual(appendix_personal["姓名"], "杨炯铭")
         self.assertEqual(appendix_personal["电话"], "13625816396")
         self.assertEqual(appendix_personal["邮箱"], "yangjm625@163.com")
+
+    def test_resume_parser_repairs_utf8_text_decoded_as_gbk(self):
+        from core.resume_parser import parse_resume_for_report
+
+        original = (
+            "个人信息\n"
+            "姓名：何超人 电话：13732237830 邮箱：2294338095@qq.com\n"
+            "自我评价\n"
+            "自我评价关键词：招聘能力、培训能力、辅导能力、激励制度\n"
+            "工作经历\n"
+            "2026.01-2026.06 阿斯利康心血管&肾脏病&糖尿病 - DSM\n"
+            "负责心血管、肾脏病、糖尿病全产品线推广。\n"
+            "2022.7-2022.12 阿斯利康心血管&糖尿病 - SPS\n"
+            "负责萧山区域核心市场的推广，获 Top Sales。\n"
+            "教育经历\n"
+            "浙江中医药大学 生物工程 本科\n"
+        )
+        mojibake = original.encode("utf-8").decode("gbk", errors="replace")
+
+        parsed = parse_resume_for_report(mojibake)
+        text = parsed["text"]
+        experience_text = " ".join(parsed["structured"]["sections"].get("experience", []))
+        summary_text = " ".join(parsed["structured"]["sections"].get("summary", []))
+
+        self.assertEqual(parsed["quality"]["status"], "ok")
+        self.assertIn("encoding_repaired", parsed["quality"]["reasons"])
+        self.assertIn("何超人", text)
+        self.assertIn("阿斯利康", experience_text)
+        self.assertIn("2026.01-2026.06", experience_text)
+        self.assertIn("招聘能力", summary_text)
+        self.assertNotIn("招聘能力、培训能力", experience_text)
+        self.assertNotIn("浣曡秴浜", text)
 
     def test_appendix_groups_multiple_roles_under_same_company_and_dedupes_summary(self):
         from core.resume_parser import parse_resume_for_report

@@ -20,6 +20,7 @@ def render_report_html(data: dict[str, Any], brand_config: dict[str, Any]) -> st
     profile = _style_profile(ctx["report_style"], brand_config)
     logo_uri = _logo_data_uri()
     experience_groups = ctx["appendix_blocks"].get("experience_groups", [])
+    project_items = ctx["appendix_blocks"].get("projects", [])
 
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -221,6 +222,8 @@ def render_report_html(data: dict[str, Any], brand_config: dict[str, Any]) -> st
 
     {_work_experience(experience_groups)}
 
+    {_project_experience(project_items)}
+
     {_job_description(ctx["job_description"])}
 
     <div class="footer">Draft for consultant review | {_escape(ctx["brand_name"])} {_escape(ctx["brand_subtitle"])}</div>
@@ -229,7 +232,7 @@ def render_report_html(data: dict[str, Any], brand_config: dict[str, Any]) -> st
 
   <section class="page">
     <h2>Original Resume Appendix / 原始简历附录</h2>
-    <div class="appendix">{_appendix(ctx["appendix_blocks"])}</div>
+    <div class="appendix">{_appendix(ctx["appendix_resume"])}</div>
     <div class="appendix-footer">{APPENDIX_FOOTER}</div>
   </section>
 </body>
@@ -343,6 +346,17 @@ def _work_experience(groups: list[dict[str, Any]]) -> str:
     return "".join(body)
 
 
+def _project_experience(items: list[str]) -> str:
+    cleaned = [_clean_display_text(item) for item in items if _clean_display_text(item)]
+    if not cleaned:
+        return ""
+    body: list[str] = ["<h2>Project Experience / 项目经历</h2>", '<section class="section-block project-summary">']
+    for item in cleaned:
+        body.append(f"<p>{_escape(item)}</p>")
+    body.append("</section>")
+    return "".join(body)
+
+
 def _personal_info(ctx: dict[str, Any]) -> str:
     rows = ctx.get("personal_info_rows") or []
     if not rows:
@@ -417,6 +431,26 @@ def _appendix(blocks: dict[str, Any]) -> str:
     if not body:
         return f"<p>{_escape(blocks.get('fallback') or '')}</p>"
     return "".join(body)
+
+
+def _appendix(resume_text: str) -> str:
+    value = str(resume_text or "").strip()
+    if not value:
+        return "<p>No original resume text was found. Please re-upload the resume file.</p>"
+    body: list[str] = []
+    for raw_line in value.splitlines():
+        line = _clean_appendix_line(raw_line.rstrip())
+        if line.strip():
+            body.append(f"<p>{_escape(line)}</p>")
+        else:
+            body.append('<p class="appendix-blank">&nbsp;</p>')
+    return "".join(body)
+
+
+def _clean_appendix_line(value: Any) -> str:
+    text = str(value or "").rstrip()
+    text = re.sub(r"^\s*(?:[\u2022\u25cf\u25e6\u2219\u26ab\u00b7]|鈥[^\w\u4e00-\u9fff]?)\s*", "", text)
+    return text
 
 
 def _experience_group_html(group: dict[str, Any], detail_limit: int) -> str:

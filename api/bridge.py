@@ -520,6 +520,8 @@ def create_app(
             return service.render_report(report_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail="Report not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.post("/api/v1/reports/{report_id}/render-html")
     def render_html_report(report_id: str) -> dict[str, Any]:
@@ -527,6 +529,8 @@ def create_app(
             return service.render_html_report(report_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail="Report not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.post("/api/v1/reports/{report_id}/render-pdf")
     def render_pdf_report(report_id: str) -> dict[str, Any]:
@@ -534,6 +538,8 @@ def create_app(
             return service.render_pdf_report(report_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail="Report not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.get("/cards/reports/{report_id}", response_class=HTMLResponse)
     def report_card(report_id: str) -> HTMLResponse:
@@ -553,6 +559,8 @@ def create_app(
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail="Report not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.post("/cards/reports/{report_id}/render-html")
     def report_card_render_html(report_id: str) -> RedirectResponse:
@@ -565,6 +573,8 @@ def create_app(
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail="Report not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.post("/cards/reports/{report_id}/render-pdf")
     def report_card_render_pdf(report_id: str) -> RedirectResponse:
@@ -577,6 +587,8 @@ def create_app(
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail="Report not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.get("/cards/reports/{report_id}/preview", response_class=HTMLResponse)
     def report_preview(report_id: str, format: str = "docx", filename: str = "") -> HTMLResponse:

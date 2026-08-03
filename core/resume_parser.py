@@ -15,6 +15,7 @@ SECTION_ALIASES = {
     "\u610f\u5411\u5c97\u4f4d": "intention",
     "career objective": "intention",
     "\u81ea\u6211\u8bc4\u4ef7": "summary",
+    "\u81ea\u6211\u8bc4\u4ef7\u5173\u952e\u8bcd": "summary",
     "\u4e2a\u4eba\u6982\u8ff0": "summary",
     "self-evaluation": "summary",
     "self evaluation": "summary",
@@ -75,7 +76,7 @@ SECTION_TITLES = {
 }
 
 SECTION_LABEL_PATTERN = (
-    r"\u4e2a\u4eba\u4fe1\u606f|\u57fa\u672c\u4fe1\u606f|\u81ea\u6211\u8bc4\u4ef7|"
+    r"\u4e2a\u4eba\u4fe1\u606f|\u57fa\u672c\u4fe1\u606f|\u81ea\u6211\u8bc4\u4ef7\u5173\u952e\u8bcd|\u81ea\u6211\u8bc4\u4ef7|"
     r"\u5de5\u4f5c\u7ecf\u5386|\u5de5\u4f5c\u7ecf\u9a8c|\u9879\u76ee\u7ecf\u5386|\u9879\u76ee\u7ecf\u9a8c|"
     r"\u53c2\u4e0e\u9879\u76ee|\u79d1\u7814\u7ecf\u5386|\u5b66\u4e60\u53ca\u79d1\u7814\u7ecf\u5386|"
     r"\u5b66\u4e60\u4e0e\u79d1\u7814\u7ecf\u5386|\u7814\u7a76\u7ecf\u5386|\u6821\u56ed\u7ecf\u5386|\u5b9e\u4e60\u7ecf\u5386|"
@@ -94,7 +95,7 @@ FIELD_LABEL_PATTERN = (
     r"\u5b66\u5386|\u5b66\u4f4d|\u4e13\u4e1a|\u4f4f\u5740|\u5730\u5740|"
     r"\u73b0\u6240\u5728\u5730|\u653f\u6cbb\u9762\u8c8c|\u671f\u671b\u85aa\u8d44|"
     r"\u670d\u52a1\u516c\u53f8|\u90e8\u95e8\u804c\u52a1|"
-    r"\u81ea\u6211\u8bc4\u4ef7|\u5de5\u4f5c\u7ecf\u5386|\u6559\u80b2\u7ecf\u5386|"
+    r"\u81ea\u6211\u8bc4\u4ef7\u5173\u952e\u8bcd|\u81ea\u6211\u8bc4\u4ef7|\u5de5\u4f5c\u7ecf\u5386|\u6559\u80b2\u7ecf\u5386|"
     r"\u6c42\u804c\u610f\u5411|\u610f\u5411\u5c97\u4f4d"
 )
 
@@ -126,15 +127,25 @@ ROLE_OR_ACHIEVEMENT_RE = re.compile(
     re.IGNORECASE,
 )
 BULLET_MARKER_RE = re.compile(r"^[\u2022\u25cf\u25e6\u2219\u26ab\u00b7\-]+\s*")
+MOJIBAKE_MARKER_RE = re.compile(
+    r"锟|�|浣|鐢|宸|闃|柉|鍒|悍|绠|鍚|濮|撳|悕|缁|忓|涓|淇|伅|瀛|"
+    r"湀|姘|鏃|閭|钀|杈|鑱|寮|骞|浠|銆|瀹|湪|鍦|尯|勫|鏉"
+)
+RESUME_KEYWORD_RE = re.compile(
+    r"个人信息|基本信息|姓名|电话|邮箱|工作经历|工作经验|项目经历|教育经历|"
+    r"自我评价|阿斯利康|诺华|辉瑞|罗氏|赛诺菲|拜耳|强生|葛兰素|经理|代表|"
+    r"负责|推广|区域|市场|医院|产品|团队"
+)
 
 
 def parse_resume_for_report(text: str) -> dict[str, Any]:
-    normalized = _normalize(text)
+    normalized, normalize_meta = _normalize_resume_text(text)
     lines = _meaningful_lines(normalized)
     sections = _refine_sections(_extract_sections(normalized), lines)
     evidence = _evidence_lines(lines)
     structured = _structured_sections(lines, evidence, sections)
     quality = assess_resume_text_quality(normalized, lines, sections)
+    _apply_normalize_quality_metadata(quality, normalized, normalize_meta)
     return {
         "text": normalized,
         "lines": lines,
@@ -164,6 +175,7 @@ def assess_resume_text_quality(
         or ENGLISH_TO_PERIOD_RE.search(value)
         or COMPANY_SIGNAL_RE.search(value.lower())
     )
+    period_count = len(PERIOD_RE.findall(value)) + len(ENGLISH_TO_PERIOD_RE.findall(value))
     reasons: list[str] = []
     needs_ocr = False
     if char_count == 0:
@@ -176,6 +188,8 @@ def assess_resume_text_quality(
         reasons.append("short_text_without_work_signal")
     if line_items and len(line_items) < 6 and char_count < 600:
         reasons.append("too_few_lines")
+    if 180 <= char_count < 700 and has_contact and has_work_signal and period_count >= 3 and len(line_items) <= 24:
+        reasons.append("short_resume_summary")
     if not has_work_signal:
         reasons.append("missing_work_or_project_signal")
     if char_count >= 350 and not has_contact:
@@ -194,15 +208,19 @@ def assess_resume_text_quality(
         "line_count": len(line_items),
         "has_contact_signal": has_contact,
         "has_work_signal": has_work_signal,
+        "period_count": period_count,
         "needs_ocr": needs_ocr,
     }
 
 
 def resume_text_from_data(data: dict[str, Any]) -> str:
+    source_text = str(data.get("original_resume") or data.get("resume_text") or "").strip()
+    if source_text:
+        return source_text
     parsed = data.get("parsed_resume")
     if isinstance(parsed, dict) and parsed.get("text"):
         return str(parsed["text"])
-    return str(data.get("original_resume") or data.get("resume_text") or "").strip()
+    return ""
 
 
 def resume_evidence_from_data(data: dict[str, Any], limit: int = 8) -> list[str]:
@@ -249,8 +267,69 @@ def resume_work_experience_from_data(data: dict[str, Any], limit: int = 8) -> li
 
 
 def _normalize(text: str) -> str:
+    value, _ = _normalize_resume_text(text)
+    return value
+
+
+def _normalize_resume_text(text: str) -> tuple[str, dict[str, Any]]:
     value = str(text or "").replace("\r\n", "\n").replace("\r", "\n")
-    return re.sub(r"\n{3,}", "\n\n", value).strip()
+    repaired = _repair_utf8_decoded_as_gbk(value)
+    metadata: dict[str, Any] = {}
+    if repaired and repaired != value:
+        value = repaired
+        metadata["encoding_repaired"] = True
+        metadata["encoding_repair"] = "utf8_as_gbk"
+    return re.sub(r"\n{3,}", "\n\n", value).strip(), metadata
+
+
+def _repair_utf8_decoded_as_gbk(text: str) -> str:
+    value = str(text or "")
+    if _mojibake_score(value) < 3:
+        return value
+    best = value
+    best_score = _resume_readability_score(value) - (_mojibake_score(value) * 4)
+    for encoding in ("gbk", "cp936"):
+        try:
+            candidate = value.encode(encoding, errors="ignore").decode("utf-8", errors="ignore")
+        except (LookupError, UnicodeError):
+            continue
+        candidate = candidate.strip()
+        if len(candidate) < max(40, len(value) * 0.35):
+            continue
+        score = _resume_readability_score(candidate) - (_mojibake_score(candidate) * 4)
+        if score > best_score + 8:
+            best = candidate
+            best_score = score
+    return best
+
+
+def _resume_readability_score(text: str) -> int:
+    value = str(text or "")
+    score = len(RESUME_KEYWORD_RE.findall(value)) * 10
+    score += len(PERIOD_RE.findall(value)) * 4
+    score += len(re.findall(r"[\u4e00-\u9fff]", value))
+    return score
+
+
+def _mojibake_score(text: str) -> int:
+    value = str(text or "")
+    return len(MOJIBAKE_MARKER_RE.findall(value))
+
+
+def _apply_normalize_quality_metadata(quality: dict[str, Any], text: str, metadata: dict[str, Any]) -> None:
+    reasons = quality.setdefault("reasons", [])
+    if metadata.get("encoding_repaired"):
+        if "encoding_repaired" not in reasons:
+            reasons.insert(0, "encoding_repaired")
+        quality["encoding_repaired"] = True
+        quality["encoding_repair"] = metadata.get("encoding_repair")
+        return
+    if _mojibake_score(text) >= 8:
+        if "mojibake_detected" not in reasons:
+            reasons.append("mojibake_detected")
+        if quality.get("status") == "ok":
+            quality["status"] = "low_confidence"
+        quality["encoding_repaired"] = False
 
 
 def _meaningful_lines(text: str) -> list[str]:
@@ -380,7 +459,12 @@ def _is_noise_line(line: str) -> bool:
 
 def _classify_resume_line(line: str, original_key: str, active: str) -> str:
     lower = line.lower()
-    if re.match(r"^(?:\u81ea\u6211\u8bc4\u4ef7|\u4e2a\u4eba\u6982\u8ff0)", line):
+    if re.match(r"^(?:\u81ea\u6211\u8bc4\u4ef7\u5173\u952e\u8bcd|\u81ea\u6211\u8bc4\u4ef7|\u4e2a\u4eba\u6982\u8ff0)", line):
+        return "summary"
+    if re.search(r"^(?:\u5173\u952e\u8bcd|keywords?)\s*[:\uff1a]", lower) or re.search(
+        r"\u62db\u8058\u80fd\u529b|\u57f9\u8bad\u80fd\u529b|\u8f85\u5bfc\u80fd\u529b|\u6fc0\u52b1\u5236\u5ea6|\u5b66\u4e60\u80fd\u529b",
+        line,
+    ):
         return "summary"
     if re.search(
         rf"^(?:{FIELD_LABEL_PATTERN})\s*[:\uff1a]",
@@ -392,7 +476,7 @@ def _classify_resume_line(line: str, original_key: str, active: str) -> str:
             return "intention"
         if re.search(r"^(?:\u670d\u52a1\u516c\u53f8|\u90e8\u95e8\u804c\u52a1)\s*[:\uff1a]", line):
             return "experience"
-        if re.search(r"^(?:\u81ea\u6211\u8bc4\u4ef7|\u4e2a\u4eba\u6982\u8ff0)\s*[:\uff1a]?", line):
+        if re.search(r"^(?:\u81ea\u6211\u8bc4\u4ef7\u5173\u952e\u8bcd|\u81ea\u6211\u8bc4\u4ef7|\u4e2a\u4eba\u6982\u8ff0)\s*[:\uff1a]?", line):
             return "summary"
         return "personal"
     if original_key in {"projects", "certificates"}:
