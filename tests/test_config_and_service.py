@@ -277,10 +277,13 @@ class ConfigAndServiceTests(unittest.TestCase):
             self.assertNotIn("Professional Photo", full_text)
             self.assertIn("2020.06", full_text)
             self.assertIn("Work Experience", full_text)
-            self.assertIn("Appendix:", footer_text)
-            self.assertGreaterEqual(len(doc.tables), 5)
+            self.assertIn("Confidential", footer_text)
+            self.assertIn("原始简历全文仅保留在附录", full_text)
+            self.assertGreaterEqual(len(doc.tables), 3)
             self.assertNotIn('<w:br w:type="page"/>', document_xml)
-            self.assertIn('<w:pageBreakBefore/>', document_xml)
+            # Work experience and the original-resume appendix each start on a
+            # fresh page so a trailing role cannot create an almost-empty page.
+            self.assertGreaterEqual(document_xml.count('<w:pageBreakBefore/>'), 2)
 
     def test_report_service_renders_review_card_html(self):
         from core.report_service import ReportService

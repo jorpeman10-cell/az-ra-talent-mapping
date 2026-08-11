@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import re
 from typing import Any
@@ -14,6 +14,7 @@ PERSONAL_LABELS = [
     "Phone",
     "Tel",
     "Mobile",
+    "Contact",
     "\u90ae\u7bb1",
     "\u7535\u5b50\u90ae\u7bb1",
     "Email",
@@ -235,8 +236,8 @@ def _personal_info_from_text(text: str) -> list[tuple[str, str]]:
         if phone:
             rows.append(("\u7535\u8bdd", phone.group(1).strip()))
             seen.add("\u7535\u8bdd")
-    if not any(label.lower() in {"phone", "tel", "mobile"} for label in seen):
-        phone = re.search(r"(?:Phone|Tel|Mobile|Cell)\s*[:：]?\s*((?:\+?\d[\d\s().-]{7,}\d))", normalized, re.IGNORECASE)
+    if not any(label.lower() in {"phone", "tel", "mobile", "contact"} for label in seen):
+        phone = re.search(r"(?:Phone|Tel|Mobile|Cell|Contact)\s*[:：]?\s*((?:\+?\d[\d\s().-]{7,}\d))", normalized, re.IGNORECASE)
         if phone:
             rows.append(("Phone", phone.group(1).strip()))
             seen.add("Phone")
@@ -273,7 +274,7 @@ def _profile_rows(data: dict[str, Any], parsed_rows: list[tuple[str, str]]) -> l
             used.add(_normalize_profile_label(item))
 
     add("Name / 姓名", data.get("candidate_name") or first("姓名", "Name"), ("姓名", "Name"))
-    add("Phone / 电话", first("电话", "手机", "Phone", "Tel", "Mobile"), ("电话", "手机", "Phone", "Tel", "Mobile"))
+    add("Phone / 电话", first("电话", "手机", "Phone", "Tel", "Mobile", "Contact"), ("电话", "手机", "Phone", "Tel", "Mobile", "Contact"))
     add("Email / 邮箱", first("邮箱", "电子邮箱", "Email", "E-mail"), ("邮箱", "电子邮箱", "Email", "E-mail"))
     add("Current / 当前", _compact_join([data.get("current_title"), data.get("current_company")]), ())
     add("Birth / 出生年月", first("出生年月", "DOB", "Date of Birth"), ("出生年月", "DOB", "Date of Birth"))
@@ -462,7 +463,7 @@ def _experience_groups(items: list[str]) -> list[dict[str, Any]]:
             if inferred_company:
                 company = inferred_company
                 remainder = " ".join(part for part in [inferred_title, inferred_detail] if part).strip()
-            elif _looks_like_english_company_name(remainder):
+            elif _looks_like_english_company_name(remainder) or _looks_like_short_english_brand(remainder):
                 company = remainder
                 remainder = ""
             elif _looks_like_suffixless_company_name(remainder):
@@ -793,6 +794,10 @@ def _can_be_preperiod_title(text: str) -> bool:
         return False
     if re.search(r"[:\uff1a]$", value):
         return False
+    # Sentence-ending punctuation marks a responsibility/detail line, not a
+    # role title that could precede a period line.
+    if re.search(r"[.!?\u3002\uff01\uff1f;\uff1b]$", value):
+        return False
     return len(value) <= 90
 
 
@@ -1119,7 +1124,7 @@ def _looks_like_english_role_title(text: str) -> bool:
         return False
     if re.search(r"\b(?:lead|provide|build|achieve|turnover|working|training|consumables|company)\b", value, re.IGNORECASE):
         return False
-    return bool(re.search(r"\b(?:manager|director|representative|supervisor|trainee|assistant|associate|head|lead|vp|president|surgeon|physician|doctor)\b", value, re.IGNORECASE))
+    return bool(re.search(r"\b(?:manager|director|representative|supervisor|trainee|assistant|associate|head|lead|vp|president|surgeon|physician|doctor|specialist|officer|engineer|analyst)\b", value, re.IGNORECASE))
 
 
 def _split_leading_role_title(text: str) -> tuple[str, str]:
@@ -1223,6 +1228,10 @@ def _looks_like_english_company_name(text: str) -> bool:
     value = re.sub(r"\s+", " ", str(text or "").strip(" -|\uff1a:"))
     if not (4 <= len(value) <= 90) or re.search(r"[\u4e00-\u9fff]", value):
         return False
+    # Company names never end with sentence punctuation; a trailing ".", ";"
+    # or similar marks a responsibility/detail line.
+    if re.search(r"[.!?;\u3002\uff01\uff1f\uff1b]$", value):
+        return False
     if _looks_like_english_resume_fragment(value) or _looks_like_role_title(value):
         return False
     if re.search(
@@ -1240,6 +1249,32 @@ def _looks_like_english_company_name(text: str) -> bool:
         return True
     words = re.findall(r"[A-Za-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u00ff]+", value)
     return 1 <= len(words) <= 4 and sum(1 for word in words if word[:1].isupper()) >= 2
+
+
+def _looks_like_short_english_brand(text: str) -> bool:
+    """Recognize short capitalized brand names (e.g. Pfizer, Eddingpharm) that
+    appear right after a date range on the same resume line.
+
+    Only used in the period-remainder context, where the text following an
+    employment date range is very likely the employer name.
+    """
+    value = re.sub(r"\s+", " ", str(text or "").strip(" -|\uff1a:"))
+    if not value or not (2 <= len(value) <= 30) or re.search(r"[\u4e00-\u9fff0-9]", value):
+        return False
+    if re.search(r"[.!?;:\u3002\uff01\uff1f\uff1b\uff1a]$", value):
+        return False
+    if (
+        _looks_like_english_resume_fragment(value)
+        or _looks_like_role_title(value)
+        or _looks_like_english_role_title(value)
+        or _looks_like_education_line(value)
+        or _looks_like_business_object_not_company(value)
+    ):
+        return False
+    words = [word for word in re.split(r"\s+", value) if word and word != "&"]
+    if not (1 <= len(words) <= 3):
+        return False
+    return all(word[:1].isupper() for word in words)
 
 
 def _looks_like_english_resume_fragment(text: str) -> bool:

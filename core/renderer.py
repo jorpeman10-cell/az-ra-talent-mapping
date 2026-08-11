@@ -7,13 +7,14 @@ from __future__ import annotations
 import base64
 import re
 from copy import deepcopy
+from datetime import date
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 
 from docx import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Inches, Pt, RGBColor
@@ -352,105 +353,381 @@ class ReportRenderer:
         section.left_margin = Cm(2.5)
         section.right_margin = Cm(2.5)
         self._apply_document_font(doc)
-        self._doc_appendix_footer(doc)
+        self._doc_footer_v3(doc)
 
         primary = "8F0E5C"
-        accent = "8F0E5C"
-        border = "E7D3DF"
-        logo_border = "E4C567"
+        hairline = "E7D3DF"
+        ink = "111827"
 
         header = doc.add_table(rows=1, cols=2)
         header.alignment = WD_TABLE_ALIGNMENT.CENTER
         header.autofit = False
-        header.columns[0].width = Cm(4.5)
-        header.columns[1].width = Cm(12.5)
+        header.columns[0].width = Cm(4.2)
+        header.columns[1].width = Cm(11.8)
         self._remove_table_borders(header)
 
         logo_cell = header.rows[0].cells[0]
         info_cell = header.rows[0].cells[1]
         logo_cell.text = ""
         info_cell.text = ""
-        self._set_cell_border_v2(logo_cell, logo_border)
         self._set_cell_vertical_alignment(logo_cell)
-        self._add_logo_to_paragraph(logo_cell.paragraphs[0], width=1.45)
-        cn = logo_cell.add_paragraph()
-        cn.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        self._add_run(cn, TSTAR_CN, size=8, bold=True, color="111111")
+        self._add_logo_to_paragraph(logo_cell.paragraphs[0], width=1.5)
 
         title = info_cell.paragraphs[0]
         title.paragraph_format.space_before = Pt(0)
-        title.paragraph_format.space_after = Pt(5)
-        self._add_run(title, "Candidate Referral Report / 候选人推荐报告", size=18, bold=True, color="111827")
+        title.paragraph_format.space_after = Pt(6)
+        self._add_run(title, "Candidate Referral Report / 候选人推荐报告", size=16, bold=True, color=ink)
 
-        meta_rows = 3 if ctx.get("salary_info") else 2
+        meta_items = [
+            ("Candidate", ctx["candidate_name"]),
+            ("Target Role", ctx["target_role"]),
+            ("Client", ctx["client_company"]),
+            ("Current", ctx["current_summary"]),
+        ]
+        if ctx.get("salary_info"):
+            meta_items.append(("Salary", ctx["salary_info"]))
+        consultant_name = str(data.get("consultant_name") or "").strip()
+        if consultant_name:
+            meta_items.append(("Consultant", consultant_name))
+        report_date = str(data.get("report_date") or "").strip() or date.today().isoformat()
+        meta_items.append(("Report Date", report_date))
+
+        meta_rows = (len(meta_items) + 1) // 2
         meta_table = info_cell.add_table(rows=meta_rows, cols=2)
         meta_table.autofit = False
-        meta_table.columns[0].width = Cm(6.2)
-        meta_table.columns[1].width = Cm(6.4)
+        meta_table.columns[0].width = Cm(5.9)
+        meta_table.columns[1].width = Cm(5.9)
         self._remove_table_borders(meta_table)
-        self._set_meta_cell(meta_table.rows[0].cells[0], "Candidate", ctx["candidate_name"], accent)
-        self._set_meta_cell(meta_table.rows[0].cells[1], "Target Role", ctx["target_role"], accent)
-        self._set_meta_cell(meta_table.rows[1].cells[0], "Client", ctx["client_company"], accent)
-        self._set_meta_cell(meta_table.rows[1].cells[1], "Current", ctx["current_summary"], accent)
-        if ctx.get("salary_info"):
-            self._set_meta_cell(meta_table.rows[2].cells[0], "Salary", ctx["salary_info"], accent)
-            meta_table.rows[2].cells[1].text = ""
+        for index, (label, value) in enumerate(meta_items):
+            cell = meta_table.rows[index // 2].cells[index % 2]
+            self._set_meta_cell(cell, label, value, primary)
 
         rule = doc.add_paragraph()
-        rule.paragraph_format.space_before = Pt(6)
-        rule.paragraph_format.space_after = Pt(8)
+        rule.paragraph_format.space_before = Pt(4)
+        rule.paragraph_format.space_after = Pt(10)
         self._doc_rule(rule, primary)
 
-        self._doc_heading(doc, "Candidate Profile / 候选人基本信息", accent)
+        section_no = 0
+
+        def next_heading(text: str, *, page_break_before: bool = False) -> None:
+            nonlocal section_no
+            section_no += 1
+            self._doc_heading_v3(
+                doc,
+                section_no,
+                text,
+                primary,
+                ink,
+                page_break_before=page_break_before,
+            )
+
+        next_heading("Candidate Profile / 候选人基本信息")
         if ctx.get("personal_info_rows"):
             personal_rows = list(ctx["personal_info_rows"])
-            self._doc_personal_info(
+            self._doc_personal_info_v3(
                 doc,
                 personal_rows,
-                border,
-                accent,
+                hairline,
+                primary,
                 ctx.get("professional_photo_data_uri", ""),
                 bool(ctx.get("professional_photo_required")),
             )
         else:
-            self._doc_panel_v2(doc, [("Name / 姓名", ctx["candidate_name"]), ("Current / 当前", ctx["current_summary"])], border)
+            self._doc_panel_v3(
+                doc,
+                [("Name / 姓名", ctx["candidate_name"]), ("Current / 当前", ctx["current_summary"])],
+                primary,
+                hairline,
+            )
 
-        self._doc_heading(doc, "Recommendation Summary / 推荐摘要", accent)
-        self._doc_panel_v2(
+        next_heading("Recommendation Summary / 推荐摘要")
+        self._doc_panel_v3(
             doc,
             [
                 ("Motivation / 求职动机", ctx["motivation"]),
                 ("Role Fit / 岗位匹配", ctx["role_fit"]),
             ],
-            border,
+            primary,
+            hairline,
         )
 
-        self._doc_heading(doc, "Consultant Assessment / 顾问评估", accent)
-        self._doc_panel_v2(
+        next_heading("Consultant Assessment / 顾问评估")
+        self._doc_panel_v3(
             doc,
             [
                 ("Strengths / 推荐亮点", ctx["strengths_summary"]),
                 ("Risks / Questions / 风险与待确认", ctx["risk_notes"]),
             ],
-            border,
+            primary,
+            hairline,
         )
 
         if ctx["appendix_blocks"].get("experience_groups"):
-            self._doc_heading(doc, "Work Experience / 工作经历", accent)
-            self._doc_experience_groups(doc, ctx["appendix_blocks"]["experience_groups"], accent)
+            next_heading("Work Experience / 工作经历", page_break_before=True)
+            self._doc_experience_groups_v3(doc, ctx["appendix_blocks"]["experience_groups"], primary, ink)
 
         if ctx["job_description"]:
-            self._doc_heading(doc, "Role Requirement Notes / JD 要求", accent)
-            self._text_box_v2(doc, str(ctx["job_description"]), border)
+            next_heading("Role Requirement Notes / JD 要求")
+            self._text_box_v3(doc, str(ctx["job_description"]), hairline)
 
-        self._doc_heading(
+        self._doc_heading_v3(
             doc,
+            None,
             "Original Resume Appendix / 原始简历附录",
-            accent,
+            primary,
+            ink,
             page_break_before=True,
+        )
+        note = doc.add_paragraph()
+        note.paragraph_format.space_after = Pt(6)
+        self._add_run(
+            note,
+            "原始简历全文仅保留在附录或随报告附件交付。 | "
+            "The original resume is preserved only in this appendix or as an attached source file.",
+            size=8,
+            color="6B7280",
         )
         self._original_resume_appendix(doc, ctx["appendix_resume"])
         return doc
+
+    # ============================================================
+    # T-STAR v3 版式辅助方法(2026-08 专业度打磨)
+    # ============================================================
+
+    def _doc_heading_v3(
+        self,
+        doc: Document,
+        number: int | None,
+        text: str,
+        color: str,
+        ink: str,
+        *,
+        page_break_before: bool = False,
+    ) -> None:
+        """Numbered section heading with a burgundy left accent bar."""
+        p = doc.add_paragraph()
+        p.paragraph_format.page_break_before = page_break_before
+        p.paragraph_format.space_before = Pt(14)
+        p.paragraph_format.space_after = Pt(6)
+        p.paragraph_format.keep_with_next = True
+        p_pr = p._p.get_or_add_pPr()
+        border = OxmlElement("w:pBdr")
+        left = OxmlElement("w:left")
+        left.set(qn("w:val"), "single")
+        left.set(qn("w:sz"), "16")
+        left.set(qn("w:space"), "8")
+        left.set(qn("w:color"), color)
+        border.append(left)
+        p_pr.append(border)
+        if number is not None:
+            self._add_run(p, f"{number:02d}  ", size=12, bold=True, color=color)
+        self._add_run(p, text, size=12, bold=True, color=ink)
+
+    def _doc_hairline(self, paragraph: Any, color: str) -> None:
+        """Thin bottom rule under a paragraph."""
+        p_pr = paragraph._p.get_or_add_pPr()
+        border = OxmlElement("w:pBdr")
+        bottom = OxmlElement("w:bottom")
+        bottom.set(qn("w:val"), "single")
+        bottom.set(qn("w:sz"), "4")
+        bottom.set(qn("w:space"), "4")
+        bottom.set(qn("w:color"), color.replace("#", ""))
+        border.append(bottom)
+        p_pr.append(border)
+
+    def _doc_panel_v3(self, doc: Document, rows: list[tuple[str, str]], color: str, hairline: str) -> None:
+        """Editorial label-over-content panel separated by hairlines (no boxes)."""
+        for index, (label, value) in enumerate(rows):
+            label_p = doc.add_paragraph()
+            label_p.paragraph_format.space_before = Pt(6 if index else 2)
+            label_p.paragraph_format.space_after = Pt(1)
+            label_p.paragraph_format.keep_with_next = True
+            self._add_run(label_p, label, size=9, bold=True, color=color)
+            value_p = doc.add_paragraph()
+            value_p.paragraph_format.space_after = Pt(6)
+            self._add_run(value_p, value or "-", size=10, color="374151")
+            self._doc_hairline(value_p, hairline)
+
+    def _set_cell_bottom_hairline(self, cell: Any, color: str) -> None:
+        """Keep only a thin bottom border on the cell."""
+        tc_pr = cell._tc.get_or_add_tcPr()
+        borders = tc_pr.find(qn("w:tcBorders"))
+        if borders is None:
+            borders = OxmlElement("w:tcBorders")
+            tc_pr.append(borders)
+        for edge in ("top", "left", "right"):
+            element = borders.find(qn(f"w:{edge}"))
+            if element is None:
+                element = OxmlElement(f"w:{edge}")
+                borders.append(element)
+            element.set(qn("w:val"), "nil")
+        bottom = borders.find(qn("w:bottom"))
+        if bottom is None:
+            bottom = OxmlElement("w:bottom")
+            borders.append(bottom)
+        bottom.set(qn("w:val"), "single")
+        bottom.set(qn("w:sz"), "4")
+        bottom.set(qn("w:color"), color.replace("#", ""))
+
+    def _doc_personal_info_v3(
+        self,
+        doc: Document,
+        rows: list[tuple[str, str]],
+        hairline: str,
+        color: str,
+        photo_data_uri: str = "",
+        photo_required: bool = False,
+    ) -> None:
+        """Borderless profile grid; rows separated by bottom hairlines only."""
+        show_photo_area = bool(str(photo_data_uri or "").strip()) or bool(photo_required)
+        layout = doc.add_table(rows=1, cols=2 if show_photo_area else 1)
+        layout.autofit = False
+        if show_photo_area:
+            layout.columns[0].width = Cm(3.0)
+            layout.columns[1].width = Cm(13.0)
+            photo_cell, info_cell = layout.rows[0].cells
+            cells = (photo_cell, info_cell)
+        else:
+            layout.columns[0].width = Cm(16.0)
+            info_cell = layout.rows[0].cells[0]
+            photo_cell = info_cell
+            cells = (info_cell,)
+        self._remove_table_borders(layout)
+        for cell in cells:
+            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
+            cell.text = ""
+
+        if show_photo_area:
+            photo_paragraph = photo_cell.paragraphs[0]
+            photo_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            if self._add_photo_to_paragraph(photo_paragraph, photo_data_uri):
+                photo_paragraph.paragraph_format.space_before = Pt(3)
+                photo_paragraph.paragraph_format.space_after = Pt(3)
+            else:
+                photo_paragraph.paragraph_format.space_before = Pt(18)
+                self._add_run(photo_paragraph, "◎", size=26, bold=True, color="CBD5E1")
+                photo_paragraph.add_run().add_break()
+                self._add_run(photo_paragraph, "职业寸照", size=9, bold=True, color="6B7280")
+                photo_paragraph.add_run().add_break()
+                self._add_run(photo_paragraph, "Professional Photo", size=8.5, color="6B7280")
+
+        table = info_cell.add_table(rows=0, cols=4)
+        table.autofit = False
+        table.columns[0].width = Cm(2.5 if show_photo_area else 2.8)
+        table.columns[1].width = Cm(4.0 if show_photo_area else 5.2)
+        table.columns[2].width = Cm(2.5 if show_photo_area else 2.8)
+        table.columns[3].width = Cm(4.0 if show_photo_area else 5.2)
+        pairs = list(rows)
+        for index in range(0, len(pairs), 2):
+            row = table.add_row()
+            for cell in row.cells:
+                self._set_cell_bottom_hairline(cell, hairline)
+                cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+                cell.text = ""
+            left = pairs[index]
+            right = pairs[index + 1] if index + 1 < len(pairs) else ("", "")
+            self._add_run(row.cells[0].paragraphs[0], left[0], size=8.8, bold=True, color=color)
+            self._add_run(row.cells[1].paragraphs[0], left[1], size=9.5, color="374151")
+            if right[0]:
+                self._add_run(row.cells[2].paragraphs[0], right[0], size=8.8, bold=True, color=color)
+                self._add_run(row.cells[3].paragraphs[0], right[1], size=9.5, color="374151")
+
+    def _doc_experience_groups_v3(self, doc: Document, groups: list[dict[str, Any]], color: str, ink: str) -> None:
+        """Company heading + role line with right-aligned period + bullets."""
+        generic = {"", "工作经历", "work experience", "professional experience", "employment history"}
+        for group in groups:
+            company_name = str(group.get("company") or "").strip()
+            show_company = company_name.lower() not in generic
+            if show_company:
+                company = doc.add_paragraph()
+                company.paragraph_format.space_before = Pt(8)
+                company.paragraph_format.space_after = Pt(1)
+                company.paragraph_format.keep_with_next = True
+                self._add_run(company, company_name, size=10.5, bold=True, color=ink)
+            for role in group.get("roles", []):
+                p = doc.add_paragraph()
+                p.paragraph_format.space_before = Pt(1 if show_company else 4)
+                p.paragraph_format.space_after = Pt(2)
+                p.paragraph_format.keep_with_next = True
+                title = str(role.get("title") or "").strip()
+                period = str(role.get("period") or "").strip()
+                if title and period and period != "-":
+                    p.paragraph_format.tab_stops.add_tab_stop(Cm(16), WD_TAB_ALIGNMENT.RIGHT)
+                    self._add_run(p, title, size=9.5, bold=True, color="374151")
+                    self._add_run(p, "\t", size=9.5)
+                    self._add_run(p, period, size=9.3, bold=True, color=color)
+                elif title:
+                    self._add_run(p, title, size=9.5, bold=True, color="374151")
+                elif period and period != "-":
+                    self._add_run(p, period, size=9.3, bold=True, color=color)
+                for detail in role.get("details", []):
+                    dp = doc.add_paragraph()
+                    dp.paragraph_format.left_indent = Cm(0.75)
+                    dp.paragraph_format.first_line_indent = Cm(-0.3)
+                    dp.paragraph_format.space_after = Pt(2)
+                    self._add_run(dp, "• ", size=9, bold=True, color=color)
+                    self._add_run(dp, str(detail), size=9, color="374151")
+
+    def _text_box_v3(self, doc: Document, text: str, hairline: str) -> None:
+        """JD text panel with hairline border and a light tinted background."""
+        table = doc.add_table(rows=1, cols=1)
+        table.autofit = False
+        table.columns[0].width = Cm(16.0)
+        panel = table.rows[0].cells[0]
+        panel.text = ""
+        self._set_cell_border_v2(panel, hairline)
+        self._shade_cell(panel, "FAF6F8")
+        paragraph = panel.paragraphs[0]
+        paragraph.paragraph_format.space_before = Pt(2)
+        paragraph.paragraph_format.space_after = Pt(2)
+        self._add_run(paragraph, text or "-", size=9.5, color="374151")
+
+    def _doc_footer_v3(self, doc: Document) -> None:
+        """Footer: brand + confidentiality note + page numbers, with a hairline above."""
+        for section in doc.sections:
+            footer = section.footer
+            footer.is_linked_to_previous = False
+            paragraph = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+            paragraph.text = ""
+            paragraph.style = doc.styles["Normal"]
+            paragraph.paragraph_format.tab_stops.add_tab_stop(Cm(8), WD_TAB_ALIGNMENT.CENTER)
+            paragraph.paragraph_format.tab_stops.add_tab_stop(Cm(16), WD_TAB_ALIGNMENT.RIGHT)
+            self._doc_top_hairline(paragraph)
+            self._add_run(paragraph, "T-STAR 泰伦仕 · Candidate Referral Report", size=8, color="6B7280")
+            self._add_run(paragraph, "\tConfidential · 保密\t", size=8, color="6B7280")
+            self._add_run(paragraph, "Page ", size=8, color="6B7280")
+            self._add_field_run(paragraph, "PAGE")
+            self._add_run(paragraph, " / ", size=8, color="6B7280")
+            self._add_field_run(paragraph, "NUMPAGES")
+
+    def _doc_top_hairline(self, paragraph: Any) -> None:
+        p_pr = paragraph._p.get_or_add_pPr()
+        border = OxmlElement("w:pBdr")
+        top = OxmlElement("w:top")
+        top.set(qn("w:val"), "single")
+        top.set(qn("w:sz"), "4")
+        top.set(qn("w:space"), "4")
+        top.set(qn("w:color"), "E7D3DF")
+        border.append(top)
+        p_pr.append(border)
+
+    def _add_field_run(self, paragraph: Any, instruction: str) -> None:
+        """Append a Word field (PAGE / NUMPAGES) as an 8pt gray run."""
+        run = paragraph.add_run()
+        run.font.size = Pt(8)
+        run.font.color.rgb = RGBColor.from_string("6B7280")
+        run.font.name = self.font_config.get("family_en", "Arial")
+        run._element.rPr.rFonts.set(qn("w:eastAsia"), self.font_config.get("family", "Microsoft YaHei"))
+        begin = OxmlElement("w:fldChar")
+        begin.set(qn("w:fldCharType"), "begin")
+        instr = OxmlElement("w:instrText")
+        instr.set(qn("xml:space"), "preserve")
+        instr.text = f" {instruction} "
+        end = OxmlElement("w:fldChar")
+        end.set(qn("w:fldCharType"), "end")
+        run._r.append(begin)
+        run._r.append(instr)
+        run._r.append(end)
 
     def _render_tstar_report(self, data: dict[str, Any]) -> Document:
         """Render a T-STAR bilingual referral report with the approved template structure."""
