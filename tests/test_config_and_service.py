@@ -1904,6 +1904,14 @@ class ConfigAndServiceTests(unittest.TestCase):
         self.assertEqual(sum(str(role.get("period") or "").startswith("2024.") for role in roles), 1)
         self.assertEqual(sum(str(role.get("period") or "").startswith("2025.") for role in roles), 1)
         self.assertEqual(sum(str(role.get("period") or "").startswith("2026.") for role in roles), 1)
+        for group in groups:
+            for role in group.get("roles", []):
+                if str(role.get("period") or "").startswith(("2018.", "2020.", "2023.", "2024.", "2025.", "2026.")):
+                    self.assertEqual(group["company"], "阿斯利康")
+        self.assertNotIn(
+            "阿斯利康心血管&肾脏病&糖尿病",
+            [str(group.get("company") or "") for group in groups],
+        )
 
 
 if __name__ == "__main__":

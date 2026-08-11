@@ -454,6 +454,10 @@ def _experience_groups(items: list[str]) -> list[dict[str, Any]]:
             remainder = remainder.replace(period, "", 1).strip(" -|\uff1a:")
         company = _extract_company(remainder)
         if not company and period:
+            company, business_line = _split_astrazeneca_business_line(remainder)
+            if company:
+                remainder = business_line
+        if not company and period:
             inferred_company, inferred_title = _split_english_company_role(remainder)
             if inferred_company:
                 company = inferred_company
@@ -1221,6 +1225,14 @@ def _split_suffixless_company_role(text: str) -> tuple[str, str, str]:
     if _is_generic_company(company) or PROFILE_FIELD_RE.match(company) or _looks_like_english_resume_fragment(company):
         return "", "", ""
     return company, title, detail
+
+
+def _split_astrazeneca_business_line(text: str) -> tuple[str, str]:
+    """Keep AstraZeneca business lines as role context, not company names."""
+    match = re.match(r"^(\u963f\u65af\u5229\u5eb7)(.+)$", re.sub(r"\s+", " ", str(text or "").strip()))
+    if not match:
+        return "", ""
+    return match.group(1), match.group(2).strip(" -|\uff1a:")
 
 
 def _split_english_company_role(text: str) -> tuple[str, str]:
