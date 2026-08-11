@@ -279,6 +279,8 @@ class ConfigAndServiceTests(unittest.TestCase):
             self.assertIn("Work Experience", full_text)
             self.assertIn("Appendix:", footer_text)
             self.assertGreaterEqual(len(doc.tables), 5)
+            self.assertNotIn('<w:br w:type="page"/>', document_xml)
+            self.assertIn('<w:pageBreakBefore/>', document_xml)
 
     def test_report_service_renders_review_card_html(self):
         from core.report_service import ReportService

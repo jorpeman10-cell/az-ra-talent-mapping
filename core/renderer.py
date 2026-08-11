@@ -443,8 +443,12 @@ class ReportRenderer:
             self._doc_heading(doc, "Role Requirement Notes / JD 要求", accent)
             self._text_box_v2(doc, str(ctx["job_description"]), border)
 
-        doc.add_page_break()
-        self._doc_heading(doc, "Original Resume Appendix / 原始简历附录", accent)
+        self._doc_heading(
+            doc,
+            "Original Resume Appendix / 原始简历附录",
+            accent,
+            page_break_before=True,
+        )
         self._original_resume_appendix(doc, ctx["appendix_resume"])
         return doc
 
@@ -549,8 +553,12 @@ class ReportRenderer:
             self._doc_heading(doc, "Role Requirement Notes / JD 要求", accent)
             self._text_box_v2(doc, str(ctx["job_description"]), border)
 
-        doc.add_page_break()
-        self._doc_heading(doc, "Original Resume Appendix / 原始简历附录", accent)
+        self._doc_heading(
+            doc,
+            "Original Resume Appendix / 原始简历附录",
+            accent,
+            page_break_before=True,
+        )
         self._doc_paragraph(doc, ctx["appendix_resume"] or ctx["original_resume"] or "Original resume not parsed.", size=9.5)
         return doc
 
@@ -726,8 +734,16 @@ class ReportRenderer:
         self._add_run(p, f"{label}: ", size=9, bold=True, color=color)
         self._add_run(p, value or "-", size=9, color="374151")
 
-    def _doc_heading(self, doc: Document, text: str, color: str) -> None:
+    def _doc_heading(
+        self,
+        doc: Document,
+        text: str,
+        color: str,
+        *,
+        page_break_before: bool = False,
+    ) -> None:
         p = doc.add_paragraph()
+        p.paragraph_format.page_break_before = page_break_before
         p.paragraph_format.space_before = Pt(12)
         p.paragraph_format.space_after = Pt(4)
         self._add_run(p, text, size=12, bold=True, color=color)
