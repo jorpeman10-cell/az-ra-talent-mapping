@@ -16,13 +16,20 @@ services:
       - GENERIC_REPORT_TEMPLATE_DIR=/app/templates
       - GENERIC_REPORT_DATA_DIR=/app/data
       - GENERIC_REPORT_BRIDGE_TOKEN=${BRIDGE_TOKEN:-}
-      - GENERIC_REPORT_PUBLIC_BASE_URL=${GENERIC_REPORT_PUBLIC_BASE_URL:-http://localhost:8810}
+      - GENERIC_REPORT_PUBLIC_BASE_URL=${GENERIC_REPORT_PUBLIC_BASE_URL:-https://lobe.hiijob.cn/generic-report-tool}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8810/health')"]
       interval: 15s
       timeout: 5s
       retries: 5
+    networks:
+      - lobe-network
 
 volumes:
   generic_report_data:
+
+networks:
+  lobe-network:
+    external: true
+    name: ${HIIJOB_SHARED_NETWORK:-lobehubaliyundeploy_lobe-network}

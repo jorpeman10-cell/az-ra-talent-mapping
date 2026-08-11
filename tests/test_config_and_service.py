@@ -1859,6 +1859,52 @@ class ConfigAndServiceTests(unittest.TestCase):
         self.assertEqual(hospital_role["period"], "1997.07 - 1998.06")
         self.assertEqual(hospital_role["title"], "Surgeon")
 
+    def test_chinese_promotion_timeline_keeps_every_employment_period(self):
+        from core.placeholder_report import build_placeholder_context
+        from core.resume_parser import parse_resume_for_report
+
+        resume = "\n".join([
+            "工作经历",
+            "2018.07-2022.12 阿斯利康心血管&糖尿病 负责萧山区域核心市场的推广",
+            "2020.7—2022.6 SMR 负责萧一/富阳人民ZOK的推广，富阳人民一年内销量由3800提升至7000+，实现销量的",
+            "翻倍，全年A/T101%，Growth8%，并于21年上旬入选公司春苗库，成为公司储备人才之一；",
+            "2023.01-2024.07 阿斯利康肾脏病 负责浙一LOKELMA的推广",
+            "2023.1—2024.7 SPS 负责浙一Lokelma的推广，于23年初接手后快速完成三个院区的产品准入与上量工作。",
+            "2024.08-2024.12 阿斯利康罕见病 负责浙北SOLIRIS的推广",
+            "2024.8—2024.12 RAM 转岗晋升至DSM级别Title，负责浙北Soliris的推广。",
+            "2025.01-2025.12 阿斯利康肾脏病&糖尿病 负责杭州及萧山核心区域LOKELMA/XIGDUO的推广",
+            "2025.1—2025.12 EPS 负责浙一Lokelma及Xigduo的推广。",
+            "2026.01-2026.06 阿斯利康心血管&肾脏病&糖尿病",
+            "2026.1—2026.6 DSM",
+            "区域市场规划能力：根据医院潜力分级，确定资源投入优先级。",
+        ])
+        context = build_placeholder_context(
+            {
+                "candidate_name": "Test",
+                "position_title": "KAM",
+                "original_resume": resume,
+                "parsed_resume": parse_resume_for_report(resume),
+            },
+            {"brand_id": "tstar"},
+        )
+        groups = context["appendix_blocks"]["experience_groups"]
+        timeline = " ".join(
+            str(role.get("period") or "")
+            for group in groups
+            for role in group.get("roles", [])
+        )
+        companies = " ".join(str(group.get("company") or "") for group in groups)
+
+        for expected in ("2018.07", "2020.7", "2023.", "2024.", "2025.", "2026."):
+            self.assertIn(expected, timeline)
+        self.assertNotIn("并于21年上旬入选公司", companies)
+        self.assertNotIn("DSM", [str(group.get("company") or "") for group in groups])
+        roles = [role for group in groups for role in group.get("roles", [])]
+        self.assertEqual(sum(str(role.get("period") or "").startswith("2023.") for role in roles), 1)
+        self.assertEqual(sum(str(role.get("period") or "").startswith("2024.") for role in roles), 1)
+        self.assertEqual(sum(str(role.get("period") or "").startswith("2025.") for role in roles), 1)
+        self.assertEqual(sum(str(role.get("period") or "").startswith("2026.") for role in roles), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

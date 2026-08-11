@@ -563,6 +563,7 @@ def _experience_groups(items: list[str]) -> list[dict[str, Any]]:
         group["roles"] = _drop_noise_placeholder_roles(group["roles"])
         group["roles"] = _filter_company_role_mismatches(str(group.get("company") or ""), group["roles"])
         group["roles"].sort(key=_role_sort_key, reverse=True)
+    groups = _merge_duplicate_periods_from_generic_groups(groups)
     groups = [group for group in groups if group.get("roles")]
     groups.sort(key=_group_sort_key, reverse=True)
     return groups
@@ -1025,7 +1026,63 @@ def _normalize_period_key(period: str) -> str:
     value = re.sub(r"[\u2013\u2014~]+", "-", value)
     value = value.replace("--", "-")
     value = re.sub(r"(?:\u73b0\u5728|present|current)$", "\u81f3\u4eca", value)
+    parts = _period_date_parts(value)
+    if parts:
+        start_year, start_month = parts[0]
+        start = f"{start_year}{start_month:02d}" if start_month else start_year
+        if re.search(r"\u81f3\u4eca|now$", value):
+            return f"{start}-present"
+        if len(parts) >= 2:
+            end_year, end_month = parts[-1]
+            end = f"{end_year}{end_month:02d}" if end_month else end_year
+            return f"{start}-{end}"
     return value.strip("-")
+
+
+def _merge_duplicate_periods_from_generic_groups(groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Merge duplicate dates only when at least one company bucket is generic.
+
+    This preserves legitimate concurrent roles at two named employers while
+    collapsing PDF/OCR duplicates such as ``2025.01`` and ``2025.1`` that were
+    split between the generic work-history bucket and a named company bucket.
+    """
+    seen: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
+    for group in groups:
+        for role in list(group.get("roles", [])):
+            key = _normalize_period_key(str(role.get("period") or ""))
+            if not key or key == "-":
+                continue
+            previous = seen.get(key)
+            if previous is None:
+                seen[key] = (group, role)
+                continue
+            previous_group, previous_role = previous
+            previous_generic = _is_generic_company(str(previous_group.get("company") or ""))
+            current_generic = _is_generic_company(str(group.get("company") or ""))
+            if not previous_generic and not current_generic:
+                continue
+            if previous_generic and not current_generic:
+                _merge_role_content(role, previous_role)
+                previous_group["roles"].remove(previous_role)
+                seen[key] = (group, role)
+            else:
+                _merge_role_content(previous_role, role)
+                group["roles"].remove(role)
+    return groups
+
+
+def _merge_role_content(target: dict[str, Any], source: dict[str, Any]) -> None:
+    target_title = str(target.get("title") or "").strip()
+    source_title = str(source.get("title") or "").strip()
+    details = [str(item).strip() for item in target.get("details", []) if str(item).strip()]
+    if source_title and not target_title:
+        target["title"] = source_title
+    elif source_title and source_title != target_title:
+        details.insert(0, source_title)
+    target["details"] = _clean_items(
+        [*details, *[str(item).strip() for item in source.get("details", []) if str(item).strip()]],
+        limit=12,
+    )
 
 
 def _role_sort_key(role: dict[str, Any]) -> tuple[int, int]:
@@ -1260,6 +1317,8 @@ def _looks_like_short_english_brand(text: str) -> bool:
     """
     value = re.sub(r"\s+", " ", str(text or "").strip(" -|\uff1a:"))
     if not value or not (2 <= len(value) <= 30) or re.search(r"[\u4e00-\u9fff0-9]", value):
+        return False
+    if re.fullmatch(r"(?:MR|SMR|SPS|RAM|EPS|DSM|KAM|MSL|RSM|NSM|PM|BM)", value, re.IGNORECASE):
         return False
     if re.search(r"[.!?;:\u3002\uff01\uff1f\uff1b\uff1a]$", value):
         return False
@@ -1550,6 +1609,8 @@ def _extract_company(text: str) -> str:
         return ""
     if _looks_like_business_object_not_company(company):
         return ""
+    if re.search(r"(?:\u5165\u9009|\u6210\u4e3a)\s*\u516c\u53f8$", company):
+        return ""
     return "" if _is_generic_company(company) else company
 
 
@@ -1601,7 +1662,7 @@ def _looks_like_detail(text: str) -> bool:
     return bool(
         re.search(
             r"\u8d1f\u8d23|\u8fbe\u6210|\u589e\u957f|\u4fdd\u7559|\u63a8\u5e7f|\u51c6\u5165|"
-            r"\u56e2\u961f|\u5ba2\u6237|\u5e02\u573a|\u4ea7\u54c1|\u533b\u9662|\d+%",
+            r"\u56e2\u961f|\u5ba2\u6237|\u5e02\u573a|\u4ea7\u54c1|\u533b\u9662|\u5165\u9009|\u6210\u4e3a|\d+%",
             text,
         )
     )
