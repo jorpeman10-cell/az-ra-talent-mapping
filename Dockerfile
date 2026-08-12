@@ -5,8 +5,10 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libreoffice-writer poppler-utils \
+RUN apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update \
+    && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
+        libreoffice-writer \
+        poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-api.txt .
