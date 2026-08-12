@@ -4,6 +4,7 @@ from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
 import os
+import shutil
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
@@ -50,6 +51,8 @@ def extract_pdf_text(path: str | Path) -> str:
 
 def extract_uploaded_text(filename: str, content: bytes) -> str:
     suffix = Path(filename).suffix.lower()
+    if suffix == ".doc":
+        return _extract_legacy_doc_upload(content)
     if suffix == ".docx":
         return clean_text(_extract_docx_content_text(content))
     if suffix in {".txt", ".md"}:
@@ -76,7 +79,27 @@ def extract_uploaded_text(filename: str, content: bytes) -> str:
                 tmp_path.unlink()
             except OSError:
                 pass
-    raise ValueError(f"Unsupported upload format: {suffix}. Use DOCX, PDF, TXT, or MD.")
+    raise ValueError(f"Unsupported upload format: {suffix}. Use DOC, DOCX, PDF, TXT, or MD.")
+
+
+def _extract_legacy_doc_upload(content: bytes) -> str:
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        raise ValueError("Legacy DOC conversion requires LibreOffice")
+    with tempfile.TemporaryDirectory(prefix="resume-doc-") as tmp:
+        tmp_dir = Path(tmp)
+        source = tmp_dir / "resume.doc"
+        source.write_bytes(content)
+        result = subprocess.run(
+            [soffice, "--headless", "--convert-to", "docx", "--outdir", str(tmp_dir), str(source)],
+            capture_output=True,
+            timeout=120,
+            check=False,
+        )
+        converted = tmp_dir / "resume.docx"
+        if result.returncode != 0 or not converted.exists():
+            raise ValueError("Legacy DOC conversion failed")
+        return clean_text(_extract_docx_content_text(converted.read_bytes()))
 
 
 def clean_text(text: str) -> str:

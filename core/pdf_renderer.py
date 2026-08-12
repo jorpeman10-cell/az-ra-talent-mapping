@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -29,15 +30,62 @@ class PdfReportRenderer:
         self.commands: list[str] = []
         self.y = 790.0
 
-    def render(self, data: dict[str, Any], output_path: str | Path) -> Path:
+    def render(
+        self,
+        data: dict[str, Any],
+        output_path: str | Path,
+        source_file_path: str | Path | None = None,
+    ) -> Path:
         output = Path(output_path)
         output.parent.mkdir(parents=True, exist_ok=True)
-        if self._render_from_html(data, output):
+        if self._render_from_docx(data, output, source_file_path):
             return output
+        if self._render_from_html(data, output, source_file_path):
+            return output
+        if data.get("resume_appendix_mode") == "structured_with_source_appendix":
+            raise RuntimeError("source_appendix_pdf_conversion_unavailable")
         output.write_bytes(self._build_pdf(data))
         return output
 
-    def _render_from_html(self, data: dict[str, Any], output: Path) -> bool:
+    def _render_from_docx(
+        self,
+        data: dict[str, Any],
+        output: Path,
+        source_file_path: str | Path | None,
+    ) -> bool:
+        soffice = shutil.which("soffice") or shutil.which("libreoffice")
+        if not soffice:
+            return False
+        from .renderer import ReportRenderer
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_dir = Path(tmp)
+            docx_path = tmp_dir / "report.docx"
+            ReportRenderer(self.brand_config, None).render(
+                data, docx_path, source_file_path=source_file_path
+            )
+            try:
+                subprocess.run(
+                    [soffice, "--headless", "--convert-to", "pdf", "--outdir", str(tmp_dir), str(docx_path)],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=120,
+                )
+            except Exception:
+                return False
+            converted = tmp_dir / "report.pdf"
+            if not converted.exists():
+                return False
+            shutil.copyfile(converted, output)
+        return output.exists() and output.stat().st_size > 0
+
+    def _render_from_html(
+        self,
+        data: dict[str, Any],
+        output: Path,
+        source_file_path: str | Path | None = None,
+    ) -> bool:
         chrome = self._chrome_path()
         if not chrome:
             return False
@@ -45,7 +93,7 @@ class PdfReportRenderer:
 
         with tempfile.TemporaryDirectory() as tmp:
             html_path = Path(tmp) / "report.html"
-            write_report_html(data, self.brand_config, html_path)
+            write_report_html(data, self.brand_config, html_path, source_file_path=source_file_path)
             try:
                 subprocess.run(
                     [
@@ -173,11 +221,6 @@ class PdfReportRenderer:
             self._paragraph(ctx["job_description"], x=58, size=9.2, width=455)
 
         self._finish_page(data)
-        self.commands = []
-        self.y = 790
-        self._heading("Original Resume Appendix / \u539f\u59cb\u7b80\u5386\u9644\u5f55")
-        original_resume = ctx["appendix_resume"] or "No original resume text was found. Please re-upload the resume file."
-        self._original_resume(original_resume)
 
     def _section(self, title: str, rows: list[tuple[str, str]]) -> None:
         self._heading(title)

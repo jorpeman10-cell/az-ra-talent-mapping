@@ -9,7 +9,7 @@ from typing import Any
 
 
 SOURCE_FILE_RE = re.compile(r"^rf_[a-f0-9]{32}$")
-SUPPORTED_SOURCE_SUFFIXES = {".pdf", ".docx", ".txt", ".md"}
+SUPPORTED_SOURCE_SUFFIXES = {".pdf", ".doc", ".docx", ".txt", ".md"}
 
 
 class SourceFileStore:

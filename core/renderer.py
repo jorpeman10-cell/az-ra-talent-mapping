@@ -21,6 +21,7 @@ from docx.shared import Cm, Inches, Pt, RGBColor
 
 from .placeholder_report import build_placeholder_context
 from .resume_parser import resume_sections_from_data
+from .source_appendix import append_source_appendix
 
 
 TSTAR_CN = "\u6cf0\u4f26\u4ed5"
@@ -41,7 +42,12 @@ class ReportRenderer:
             "size": branding.get("font_size", 10.5),
         }
 
-    def render(self, data: dict[str, Any], output_path: str | Path) -> Path:
+    def render(
+        self,
+        data: dict[str, Any],
+        output_path: str | Path,
+        source_file_path: str | Path | None = None,
+    ) -> Path:
         """
         渲染报告
 
@@ -64,6 +70,11 @@ class ReportRenderer:
         else:
             # 模式 2: 程序化构建
             doc = self._render_programmatically(data)
+
+        if data.get("resume_appendix_mode") == "structured_with_source_appendix":
+            if not source_file_path:
+                raise ValueError("source_file_required")
+            append_source_appendix(doc, source_file_path)
 
         # 保存
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -470,24 +481,6 @@ class ReportRenderer:
             next_heading("Role Requirement Notes / JD 要求")
             self._text_box_v3(doc, str(ctx["job_description"]), hairline)
 
-        self._doc_heading_v3(
-            doc,
-            None,
-            "Original Resume Appendix / 原始简历附录",
-            primary,
-            ink,
-            page_break_before=True,
-        )
-        note = doc.add_paragraph()
-        note.paragraph_format.space_after = Pt(6)
-        self._add_run(
-            note,
-            "原始简历全文仅保留在附录或随报告附件交付。 | "
-            "The original resume is preserved only in this appendix or as an attached source file.",
-            size=8,
-            color="6B7280",
-        )
-        self._original_resume_appendix(doc, ctx["appendix_resume"])
         return doc
 
     # ============================================================
@@ -830,13 +823,6 @@ class ReportRenderer:
             self._doc_heading(doc, "Role Requirement Notes / JD 要求", accent)
             self._text_box_v2(doc, str(ctx["job_description"]), border)
 
-        self._doc_heading(
-            doc,
-            "Original Resume Appendix / 原始简历附录",
-            accent,
-            page_break_before=True,
-        )
-        self._doc_paragraph(doc, ctx["appendix_resume"] or ctx["original_resume"] or "Original resume not parsed.", size=9.5)
         return doc
 
     def _render_default_report(self, data: dict[str, Any]) -> Document:

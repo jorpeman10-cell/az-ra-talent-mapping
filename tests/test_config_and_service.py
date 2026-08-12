@@ -267,7 +267,7 @@ class ConfigAndServiceTests(unittest.TestCase):
 
             self.assertIn("Candidate Profile", full_text)
             self.assertIn("Work Experience", full_text)
-            self.assertIn("Original Resume Appendix", full_text)
+            self.assertNotIn("Original Resume Appendix", full_text)
             self.assertNotIn("Parsing Confidence", full_text)
             self.assertNotIn("Structured Resume", full_text)
             self.assertNotIn("封面与使用说明", full_text)
@@ -278,12 +278,12 @@ class ConfigAndServiceTests(unittest.TestCase):
             self.assertIn("2020.06", full_text)
             self.assertIn("Work Experience", full_text)
             self.assertIn("Confidential", footer_text)
-            self.assertIn("原始简历全文仅保留在附录", full_text)
+            self.assertNotIn("原始简历全文仅保留在附录", full_text)
             self.assertGreaterEqual(len(doc.tables), 3)
             self.assertNotIn('<w:br w:type="page"/>', document_xml)
-            # Work experience and the original-resume appendix each start on a
-            # fresh page so a trailing role cannot create an almost-empty page.
-            self.assertGreaterEqual(document_xml.count('<w:pageBreakBefore/>'), 2)
+            # Work experience starts on a fresh page; structured-only reports
+            # intentionally omit the source appendix.
+            self.assertGreaterEqual(document_xml.count('<w:pageBreakBefore/>'), 1)
 
     def test_report_service_renders_review_card_html(self):
         from core.report_service import ReportService

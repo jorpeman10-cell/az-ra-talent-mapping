@@ -575,9 +575,9 @@ class ApiBridgeTests(unittest.TestCase):
             self.assertGreater(len(pdf_bytes), 1000)
             reader = PdfReader(str(output_path))
             text = "\n".join(page.extract_text() or "" for page in reader.pages)
-            self.assertGreaterEqual(len(reader.pages), 2)
-            self.assertIn("Original Resume Appendix", text)
-            self.assertIn("FINAL_RESUME_MARKER_190_PERCENT", re.sub(r"\s+", "", text))
+            self.assertGreaterEqual(len(reader.pages), 1)
+            self.assertNotIn("Original Resume Appendix", text)
+            self.assertNotIn("FINAL_RESUME_MARKER_190_PERCENT", re.sub(r"\s+", "", text))
 
     def test_html_report_supports_consulting_blue_style(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -603,14 +603,16 @@ class ApiBridgeTests(unittest.TestCase):
             self.assertIn("Candidate Profile", html_text)
             self.assertIn("Work Experience", html_text)
             self.assertNotIn("Resume Evidence", html_text)
-            self.assertIn("Appendix:", html_text)
-            self.assertIn("Original Resume Appendix", html_text)
+            self.assertNotIn("Appendix:", html_text)
+            self.assertNotIn("Original Resume Appendix", html_text)
             self.assertNotIn("Parsing Confidence", html_text)
             self.assertNotIn("Parsed Resume Sections", html_text)
             self.assertNotIn("Structured Resume", html_text)
             self.assertIn("Alice led oncology launch work", html_text)
 
     def test_html_report_keeps_full_original_resume_appendix(self):
+        import base64
+
         with tempfile.TemporaryDirectory() as tmp:
             app = create_app(config_dir=PROJECT_ROOT / "config", data_dir=Path(tmp), public_base_url="http://testserver")
             client = TestClient(app)
@@ -628,6 +630,9 @@ class ApiBridgeTests(unittest.TestCase):
                 "candidate_name": "ZHENG Huang",
                 "position_title": "地区经理",
                 "resume_text": resume_text,
+                "resume_file_name": "ZHENG-Huang.txt",
+                "resume_file_base64": base64.b64encode(resume_text.encode("utf-8")).decode("ascii"),
+                "resume_appendix_mode": "structured_with_source_appendix",
             })
             self.assertEqual(draft_response.status_code, 200, draft_response.text)
             report_id = draft_response.json()["report_id"]

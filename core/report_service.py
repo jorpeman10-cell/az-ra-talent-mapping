@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import re
 import uuid
@@ -17,6 +19,7 @@ from .pdf_renderer import PdfReportRenderer
 from .redactor import privacy_redact
 from .renderer import ReportRenderer
 from .resume_parser import parse_resume_for_report
+from .source_file_store import SourceFileStore
 from .validator import DataValidator
 
 DEFAULT_PUBLIC_BASE_URL = "http://localhost:8810"
@@ -42,6 +45,11 @@ REPORT_UPDATE_FIELDS = {
     "professional_photo_data_uri",
     "professional_photo_file_name",
     "professional_photo_required",
+    "resume_appendix_mode",
+    "resume_source_file_id",
+    "resume_source_file_name",
+    "resume_source_mime_type",
+    "resume_source_content_hash",
 }
 
 RATIONALE_UPDATE_FIELDS = {
@@ -64,6 +72,7 @@ class ReportService:
         self.public_base_url = public_base_url.rstrip("/")
         self.agent_client = agent_client or HiijobAgentClient.from_env()
         self.brief_store = CandidateBriefStore(self.data_dir)
+        self.source_file_store = SourceFileStore(self.data_dir)
         self.drafts_dir = self.data_dir / "drafts"
         self.outputs_dir = self.data_dir / "outputs"
         self.drafts_dir.mkdir(parents=True, exist_ok=True)
@@ -73,6 +82,8 @@ class ReportService:
         brand_id = payload.get("brand_id") or "default"
         brand_config = self.loader.load_brand(brand_id)
         data = dict(payload)
+        self._materialize_source_file(data)
+        self._validate_appendix_mode(data)
         data["brand_id"] = brand_id
         data["report_style"] = self._normalize_report_style(data.get("report_style"))
         if data.get("resume_text") and not data.get("original_resume"):
@@ -99,6 +110,9 @@ class ReportService:
         }
         self._save_record(record)
         return self._response_for(record)
+
+    def create_source_file(self, filename: str, content: bytes, mime_type: str = "") -> dict[str, Any]:
+        return self.source_file_store.create(filename, content, mime_type)
 
     def generate_comments(self, report_id: str, feedback: str = "") -> dict[str, Any]:
         record = self._load_record(report_id)
@@ -132,7 +146,11 @@ class ReportService:
         data = DataValidator(brand_config).prepare_draft_payload(record["data"])
         filename = self._filename(brand_config, data, "docx")
         output_path = self.outputs_dir / filename
-        ReportRenderer(brand_config, None).render(data, output_path)
+        ReportRenderer(brand_config, None).render(
+            data,
+            output_path,
+            source_file_path=self._source_appendix_path(data),
+        )
         validation = DataValidator(brand_config).validate(record["data"])
         record["status"] = "confirmed" if validation.is_valid else "draft"
         record["validation"] = validation.to_dict()
@@ -212,6 +230,14 @@ class ReportService:
                 updated_fields["parsed_resume"] = data["parsed_resume"]
                 updated_fields["resume_quality"] = data.get("resume_quality")
 
+        if {
+            "resume_appendix_mode",
+            "resume_source_file_id",
+        }.intersection(updated_fields):
+            self._materialize_source_file(data)
+            self._validate_appendix_mode(data)
+            updated_fields["resume_appendix_mode"] = data["resume_appendix_mode"]
+
         brand_config = self.loader.load_brand(data.get("brand_id") or record["brand_id"])
         validation = DataValidator(brand_config).validate(data)
         record["brand_id"] = data.get("brand_id") or record["brand_id"]
@@ -232,7 +258,12 @@ class ReportService:
         data = DataValidator(brand_config).prepare_draft_payload(record["data"])
         filename = self._filename(brand_config, data, "html")
         output_path = self.outputs_dir / filename
-        write_report_html(data, brand_config, output_path)
+        write_report_html(
+            data,
+            brand_config,
+            output_path,
+            source_file_path=self._source_appendix_path(data),
+        )
         record["output_html"] = {"filename": filename}
         record["updated_at"] = datetime.now(UTC).isoformat()
         self._save_record(record)
@@ -251,7 +282,11 @@ class ReportService:
         data = DataValidator(brand_config).prepare_draft_payload(record["data"])
         filename = self._filename(brand_config, data, "pdf")
         output_path = self.outputs_dir / filename
-        PdfReportRenderer(brand_config).render(data, output_path)
+        PdfReportRenderer(brand_config).render(
+            data,
+            output_path,
+            source_file_path=self._source_appendix_path(data),
+        )
         record["output_pdf"] = {"filename": filename}
         record["updated_at"] = datetime.now(UTC).isoformat()
         self._save_record(record)
@@ -428,6 +463,47 @@ class ReportService:
             bool(data.get("candidate_brief")),
             str(data.get("original_resume") or data.get("resume_text") or ""),
         )
+
+    def _materialize_source_file(self, data: dict[str, Any]) -> None:
+        encoded = str(data.pop("resume_file_base64", "") or "").strip()
+        if encoded:
+            try:
+                content = base64.b64decode(encoded, validate=True)
+            except (ValueError, binascii.Error) as exc:
+                raise ValueError("invalid_source_file_base64") from exc
+            record = self.source_file_store.create(
+                str(data.get("resume_file_name") or "resume"),
+                content,
+                str(data.pop("resume_file_mime_type", "") or ""),
+            )
+            self._apply_source_file_record(data, record)
+        elif data.get("resume_source_file_id"):
+            record = self.source_file_store.load(str(data["resume_source_file_id"]))
+            self._apply_source_file_record(data, record)
+
+    @staticmethod
+    def _apply_source_file_record(data: dict[str, Any], record: dict[str, Any]) -> None:
+        data["resume_source_file_id"] = record["source_file_id"]
+        data["resume_source_file_name"] = record["file_name"]
+        data["resume_source_mime_type"] = record.get("mime_type", "")
+        data["resume_source_content_hash"] = record["content_hash"]
+
+    @staticmethod
+    def _validate_appendix_mode(data: dict[str, Any]) -> None:
+        mode = str(data.get("resume_appendix_mode") or "structured_only").strip()
+        if mode not in {"structured_only", "structured_with_source_appendix"}:
+            raise ValueError("invalid_resume_appendix_mode")
+        if mode == "structured_with_source_appendix" and not data.get("resume_source_file_id"):
+            raise ValueError("source_file_required")
+        data["resume_appendix_mode"] = mode
+
+    def _source_appendix_path(self, data: dict[str, Any]) -> Path | None:
+        if data.get("resume_appendix_mode") != "structured_with_source_appendix":
+            return None
+        source_file_id = str(data.get("resume_source_file_id") or "")
+        if not source_file_id:
+            raise ValueError("source_file_required")
+        return self.source_file_store.path_for(source_file_id)
 
     def _apply_candidate_brief_defaults(self, data: dict[str, Any], brief: dict[str, Any]) -> None:
         identity = brief.get("identity") if isinstance(brief.get("identity"), dict) else {}

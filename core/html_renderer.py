@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .placeholder_report import build_placeholder_context
+from .source_appendix import source_appendix_html
 
 
 APPENDIX_FOOTER = (
@@ -15,12 +16,23 @@ APPENDIX_FOOTER = (
 )
 
 
-def render_report_html(data: dict[str, Any], brand_config: dict[str, Any]) -> str:
+def render_report_html(
+    data: dict[str, Any],
+    brand_config: dict[str, Any],
+    source_file_path: str | Path | None = None,
+) -> str:
     ctx = build_placeholder_context(data, brand_config)
     profile = _style_profile(ctx["report_style"], brand_config)
     logo_uri = _logo_data_uri()
     experience_groups = ctx["appendix_blocks"].get("experience_groups", [])
     project_items = ctx["appendix_blocks"].get("projects", [])
+
+    source_appendix = ""
+    if data.get("resume_appendix_mode") == "structured_with_source_appendix":
+        if not source_file_path:
+            raise ValueError("source_file_required")
+        source_appendix = source_appendix_html(source_file_path)
+    appendix_footer = APPENDIX_FOOTER if source_appendix else ""
 
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -175,6 +187,9 @@ def render_report_html(data: dict[str, Any], brand_config: dict[str, Any]) -> st
       font-size: 9.2px;
       text-align: center;
     }}
+    .source-image-page {{ display: grid; place-items: center; padding: 10mm; }}
+    .source-image-page img {{ max-width: 100%; max-height: 277mm; object-fit: contain; }}
+    .source-text-page p {{ margin: 0 0 2px; white-space: pre-wrap; }}
     .footer {{ margin-top: 10mm; text-align: right; color: #6b7280; font-size: 10.5px; }}
     @media print {{
       body {{ background: #fff; padding: 0; }}
@@ -227,22 +242,23 @@ def render_report_html(data: dict[str, Any], brand_config: dict[str, Any]) -> st
     {_job_description(ctx["job_description"])}
 
     <div class="footer">Draft for consultant review | {_escape(ctx["brand_name"])} {_escape(ctx["brand_subtitle"])}</div>
-    <div class="appendix-footer">{APPENDIX_FOOTER}</div>
+    <div class="appendix-footer">{appendix_footer}</div>
   </main>
 
-  <section class="page">
-    <h2>Original Resume Appendix / 原始简历附录</h2>
-    <div class="appendix">{_appendix(ctx["appendix_resume"])}</div>
-    <div class="appendix-footer">{APPENDIX_FOOTER}</div>
-  </section>
+  {source_appendix}
 </body>
 </html>"""
 
 
-def write_report_html(data: dict[str, Any], brand_config: dict[str, Any], output_path: str | Path) -> Path:
+def write_report_html(
+    data: dict[str, Any],
+    brand_config: dict[str, Any],
+    output_path: str | Path,
+    source_file_path: str | Path | None = None,
+) -> Path:
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(render_report_html(data, brand_config), encoding="utf-8")
+    output.write_text(render_report_html(data, brand_config, source_file_path), encoding="utf-8")
     return output
 
 
@@ -388,69 +404,6 @@ def _job_description(text: str) -> str:
     if not text:
         return ""
     return f"<h2>Role Requirement Notes / JD 要求</h2>{_table([('JD / 职位需求', text)])}"
-
-
-def _appendix(blocks: dict[str, Any]) -> str:
-    if not blocks:
-        return "No original resume text was found. Please re-upload the resume file."
-    body: list[str] = []
-    personal = blocks.get("personal") or []
-    if personal:
-        body.append('<section class="appendix-section"><h3>个人信息</h3><div class="appendix-info">')
-        for label, value in personal:
-            body.append(f"<div><b>{_escape(label)}</b>：{_escape(value)}</div>")
-        body.append("</div></section>")
-    summary = blocks.get("summary") or []
-    if summary:
-        body.append('<section class="appendix-section"><h3>自我评价</h3>')
-        for item in summary:
-            body.append(f"<p>{_escape(item)}</p>")
-        body.append("</section>")
-    experience_groups = blocks.get("experience_groups") or []
-    if experience_groups:
-        body.append('<section class="appendix-section"><h3>工作经历</h3>')
-        for heading, section_groups in _bilingual_group_sections(experience_groups):
-            if heading:
-                body.append(f'<h3 class="language-subheading">{_escape(heading)}</h3>')
-            for group in section_groups:
-                body.append(_experience_group_html(group, detail_limit=50))
-        body.append("</section>")
-    for title, key in [("教育经历", "education"), ("核心技能", "skills")]:
-        items = blocks.get(key) or []
-        if items:
-            body.append(f'<section class="appendix-section"><h3>{_escape(title)}</h3>')
-            for item in items:
-                body.append(f"<p>{_escape(item)}</p>")
-            body.append("</section>")
-    projects = blocks.get("projects") or []
-    if projects:
-        body.append('<section class="appendix-section"><h3>Project Experience / 项目经历</h3>')
-        for item in projects:
-            body.append(f"<p>{_escape(item)}</p>")
-        body.append("</section>")
-    if not body:
-        return f"<p>{_escape(blocks.get('fallback') or '')}</p>"
-    return "".join(body)
-
-
-def _appendix(resume_text: str) -> str:
-    value = str(resume_text or "").strip()
-    if not value:
-        return "<p>No original resume text was found. Please re-upload the resume file.</p>"
-    body: list[str] = []
-    for raw_line in value.splitlines():
-        line = _clean_appendix_line(raw_line.rstrip())
-        if line.strip():
-            body.append(f"<p>{_escape(line)}</p>")
-        else:
-            body.append('<p class="appendix-blank">&nbsp;</p>')
-    return "".join(body)
-
-
-def _clean_appendix_line(value: Any) -> str:
-    text = str(value or "").rstrip()
-    text = re.sub(r"^\s*(?:[\u2022\u25cf\u25e6\u2219\u26ab\u00b7]|鈥[^\w\u4e00-\u9fff]?)\s*", "", text)
-    return text
 
 
 def _experience_group_html(group: dict[str, Any], detail_limit: int) -> str:

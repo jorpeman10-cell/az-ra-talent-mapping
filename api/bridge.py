@@ -38,6 +38,13 @@ class DraftRequest(BaseModel):
     resume_source_id: str = ""
     candidate_brief_id: str = ""
     resume_file_name: str = ""
+    resume_file_mime_type: str = ""
+    resume_file_base64: str = ""
+    resume_appendix_mode: str = "structured_only"
+    resume_source_file_id: str = ""
+    resume_source_file_name: str = ""
+    resume_source_mime_type: str = ""
+    resume_source_content_hash: str = ""
     job_description: str = ""
     salary_info: str = ""
     report_style: str = "tstar_warm"
@@ -49,6 +56,14 @@ class DraftRequest(BaseModel):
 
     @model_validator(mode="after")
     def require_identity_or_resume_reference(self) -> "DraftRequest":
+        if self.resume_appendix_mode not in {"structured_only", "structured_with_source_appendix"}:
+            raise ValueError("invalid_resume_appendix_mode")
+        if (
+            self.resume_appendix_mode == "structured_with_source_appendix"
+            and not self.resume_source_file_id
+            and not self.resume_file_base64
+        ):
+            raise ValueError("source_file_required")
         has_reference = bool(self.candidate_brief_id or self.resume_source_id or self.resume_text)
         if not has_reference and (not self.candidate_name or not self.position_title):
             raise ValueError("candidate_name and position_title are required unless a resume reference is provided")
@@ -97,14 +112,19 @@ def _infer_client_company(text: str) -> str:
             return match.group(1).strip()
     return ""
 
-async def _extract_upload(upload: UploadFile | None) -> tuple[str, str]:
+async def _extract_upload(upload: UploadFile | None) -> tuple[str, str, bytes, str]:
     if upload is None or not upload.filename:
-        return "", ""
+        return "", "", b"", ""
     content = await upload.read()
     if not content:
-        return upload.filename, ""
+        return upload.filename, "", b"", str(upload.content_type or "")
     try:
-        return upload.filename, extract_uploaded_text(upload.filename, content)
+        return (
+            upload.filename,
+            extract_uploaded_text(upload.filename, content),
+            content,
+            str(upload.content_type or ""),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -256,9 +276,20 @@ def create_app(
       </label>
       <label class="full">
         Resume File
-        <input type="file" name="resume_file" accept=".pdf,.docx,.txt,.md" required>
-        <span class="hint">Required. Supports PDF / DOCX / TXT / MD.</span>
+        <input type="file" name="resume_file" accept=".pdf,.doc,.docx,.txt,.md" required>
+        <span class="hint">Required. Supports PDF / DOC / DOCX / TXT / MD.</span>
       </label>
+      <fieldset class="full" style="border:1px solid #cbd5e1;border-radius:6px;padding:12px;">
+        <legend style="padding:0 6px;font-size:13px;font-weight:600;color:#344054;">Resume Appendix / 简历附录方式</legend>
+        <label style="display:flex;grid-template-columns:auto 1fr;align-items:flex-start;gap:8px;margin:0 0 9px;">
+          <input type="radio" name="resume_appendix_mode" value="structured_only" checked style="width:auto;margin-top:3px;">
+          <span>Standardized resume only / 仅标准化简历<span class="hint" style="display:block;">Parse and fill the report template without source-file pages.</span></span>
+        </label>
+        <label style="display:flex;grid-template-columns:auto 1fr;align-items:flex-start;gap:8px;margin:0;">
+          <input type="radio" name="resume_appendix_mode" value="structured_with_source_appendix" style="width:auto;margin-top:3px;">
+          <span>Standardized resume + source appendix / 标准化简历 + 原文附录<span class="hint" style="display:block;">PDF/DOCX preserve pages; TXT/MD preserve complete source order and line breaks.</span></span>
+        </label>
+      </fieldset>
       <label class="full">
         Professional Photo / 职业照
         <input type="file" name="professional_photo" accept=".jpg,.jpeg,.png,.webp">
@@ -443,22 +474,31 @@ def create_app(
         client_company: str = Form(""),
         jd_text: str = Form(""),
         report_style: str = Form("tstar_warm"),
+        resume_appendix_mode: str = Form("structured_only"),
         professional_photo_required: str = Form(""),
         resume_file: UploadFile = File(...),
         professional_photo: UploadFile | None = File(None),
         jd_file: UploadFile | None = File(None),
     ) -> dict[str, Any]:
-        resume_name, resume_text = await _extract_upload(resume_file)
+        resume_name, resume_text, resume_content, resume_mime_type = await _extract_upload(resume_file)
         photo_name, photo_data_uri = await _extract_photo_upload(professional_photo)
-        jd_name, jd_file_text = await _extract_upload(jd_file)
+        jd_name, jd_file_text, _, _ = await _extract_upload(jd_file)
         jd_description = "\n\n".join(part.strip() for part in [jd_file_text, jd_text] if part.strip())
         inferred_client_company = client_company.strip() or _infer_client_company(jd_description)
+        if resume_appendix_mode not in {"structured_only", "structured_with_source_appendix"}:
+            raise HTTPException(status_code=422, detail="invalid_resume_appendix_mode")
+        source_record = service.create_source_file(resume_name, resume_content, resume_mime_type)
         payload = {
             "brand_id": brand_id,
             "candidate_name": candidate_name,
             "position_title": position_title,
             "resume_file_name": resume_name,
             "resume_text": resume_text,
+            "resume_appendix_mode": resume_appendix_mode,
+            "resume_source_file_id": source_record["source_file_id"],
+            "resume_source_file_name": source_record["file_name"],
+            "resume_source_mime_type": source_record.get("mime_type", ""),
+            "resume_source_content_hash": source_record["content_hash"],
             "job_description": jd_description,
             "report_style": report_style,
             "jd_file_name": jd_name,
@@ -513,6 +553,8 @@ def create_app(
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail="Report not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.post("/api/v1/reports/{report_id}/render")
     def render_report(report_id: str) -> dict[str, Any]:
