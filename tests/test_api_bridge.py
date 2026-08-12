@@ -301,6 +301,55 @@ class ApiBridgeTests(unittest.TestCase):
             self.assertIn("missing_work_or_project_signal", detail["quality"]["reasons"])
             self.assertEqual(detail["next_action"], "upload_text_resume_or_run_ocr")
 
+    def test_candidate_brief_allows_substantial_resume_without_contact_details(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = create_app(
+                config_dir=PROJECT_ROOT / "config",
+                data_dir=Path(tmp),
+                public_base_url="http://testserver",
+            )
+            client = TestClient(app)
+            role_detail = (
+                "Led regional product strategy, hospital access, cross-functional collaboration, "
+                "team coaching, budget management, and measurable sales growth across key accounts."
+            )
+            substantial_resume = "\n".join(
+                [
+                    "Candidate Profile",
+                    "Professional Summary",
+                    "Work Experience",
+                    "2021.01-2026.06 AstraZeneca - Regional Business Manager",
+                    *([role_detail] * 45),
+                    "2016.03-2020.12 Novartis - Key Account Manager",
+                    *([role_detail] * 35),
+                    "Education",
+                    "Zhejiang University - Bachelor of Medicine",
+                ]
+            )
+            self.assertGreater(len(substantial_resume), 10_000)
+
+            source_response = client.post(
+                "/api/v1/resume-sources",
+                json={"text": substantial_resume, "file_name": "resume-without-contact.txt"},
+            )
+            self.assertEqual(source_response.status_code, 200, source_response.text)
+
+            brief_response = client.post(
+                "/api/v1/candidate-briefs",
+                json={
+                    "resume_source_id": source_response.json()["resume_source_id"],
+                    "known_fields": {
+                        "candidate_name": "Contact Pending",
+                        "position_title": "Business Unit Head",
+                    },
+                },
+            )
+
+            self.assertEqual(brief_response.status_code, 200, brief_response.text)
+            quality = brief_response.json()["candidate_brief"]["metadata"]["resume_quality"]
+            self.assertEqual(quality["status"], "low_confidence")
+            self.assertEqual(quality["reasons"], ["missing_contact_signal"])
+
     def test_render_rejects_agent_summarized_resume_with_422(self):
         with tempfile.TemporaryDirectory() as tmp:
             app = create_app(config_dir=PROJECT_ROOT / "config", data_dir=Path(tmp), public_base_url="http://testserver")

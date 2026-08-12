@@ -159,10 +159,18 @@ class CandidateBriefStore:
 def _ensure_publishable_resume(parsed: dict[str, Any]) -> None:
     quality = parsed.get("quality") if isinstance(parsed.get("quality"), dict) else {}
     status = str(quality.get("status") or "")
-    if status != "ok":
-        if not quality:
-            quality = {"status": "low_confidence", "reasons": ["missing_quality_assessment"]}
-        raise ResumeQualityError(quality)
+    reasons = {str(reason) for reason in quality.get("reasons", [])}
+    contact_only_warning = (
+        status == "low_confidence"
+        and reasons == {"missing_contact_signal"}
+        and bool(quality.get("has_work_signal"))
+        and not bool(quality.get("needs_ocr"))
+    )
+    if status == "ok" or contact_only_warning:
+        return
+    if not quality:
+        quality = {"status": "low_confidence", "reasons": ["missing_quality_assessment"]}
+    raise ResumeQualityError(quality)
 
 
 def _compact_dict(values: dict[str, Any]) -> dict[str, Any]:
