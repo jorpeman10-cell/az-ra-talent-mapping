@@ -279,7 +279,127 @@ def _normalize_resume_text(text: str) -> tuple[str, dict[str, Any]]:
         value = repaired
         metadata["encoding_repaired"] = True
         metadata["encoding_repair"] = "utf8_as_gbk"
+    value = _repair_wrapped_pdf_lines(value)
     return re.sub(r"\n{3,}", "\n\n", value).strip(), metadata
+
+
+def _repair_wrapped_pdf_lines(text: str) -> str:
+    """Repair common pypdf bullet glyph and visual-line wrapping artifacts."""
+    source_lines = str(text or "").splitlines()
+    repaired: list[str] = []
+    bullet_buffer = ""
+
+    def flush_bullet() -> None:
+        nonlocal bullet_buffer
+        if bullet_buffer:
+            repaired.append(bullet_buffer)
+            bullet_buffer = ""
+
+    for index, raw_line in enumerate(source_lines):
+        line = raw_line.strip()
+        if not line:
+            flush_bullet()
+            if repaired and repaired[-1] != "":
+                repaired.append("")
+            continue
+
+        replacement_bullet = re.match(r"^\ufffd+\s*(.*)$", line)
+        supported_bullet = re.match(r"^[\u2022\u25cf\u25e6\u2219\u26ab\u00b7]\s*(.*)$", line)
+        if replacement_bullet or supported_bullet:
+            flush_bullet()
+            content = (replacement_bullet or supported_bullet).group(1).strip()
+            bullet_buffer = f"\u2022 {content}" if content else "\u2022"
+            continue
+
+        if not bullet_buffer:
+            repaired.append(line)
+            continue
+
+        next_line = ""
+        for candidate in source_lines[index + 1 :]:
+            if candidate.strip():
+                next_line = candidate.strip()
+                break
+        canonical = _canonical_section(line)
+        if _is_wrapped_honor_fragment(line, canonical, next_line):
+            bullet_buffer = _join_wrapped_resume_text(bullet_buffer, line)
+            continue
+        if canonical or _is_resume_record_boundary(line):
+            flush_bullet()
+            repaired.append(line)
+            continue
+        bullet_buffer = _join_wrapped_resume_text(bullet_buffer, line)
+
+    flush_bullet()
+    return "\n".join(repaired)
+
+
+def _join_wrapped_resume_text(left: str, right: str) -> str:
+    left_value = str(left or "").rstrip()
+    right_value = str(right or "").lstrip()
+    if not left_value:
+        return right_value
+    if not right_value:
+        return left_value
+    left_char = left_value[-1]
+    right_char = right_value[0]
+    needs_space = bool(
+        (re.match(r"[A-Za-z0-9)]", left_char) and re.match(r"[A-Za-z0-9(]", right_char))
+        or (re.match(r"[\u4e00-\u9fff]", left_char) and right_char.isdigit())
+        or (left_char.isdigit() and re.match(r"[\u4e00-\u9fff]", right_char))
+    )
+    return f"{left_value}{' ' if needs_space else ''}{right_value}"
+
+
+def _is_wrapped_honor_fragment(line: str, canonical: str, next_line: str) -> bool:
+    compact = re.sub(r"\s+", "", str(line or ""))
+    return bool(
+        canonical == "certificates"
+        and compact == "\u8363\u8a89"
+        and re.match(r"^\d+\s*(?:\u4eba\u6b21|\u6b21|\u9879|\u540d|\u4e2a)", str(next_line or ""))
+    )
+
+
+def _is_resume_record_boundary(line: str) -> bool:
+    value = str(line or "").strip()
+    if not value:
+        return True
+    if PERIOD_RE.match(value) or ENGLISH_TO_PERIOD_RE.match(value):
+        return True
+    if re.match(rf"^(?:{FIELD_LABEL_PATTERN})\s*[:\uff1a]", value):
+        return True
+    if _looks_like_education_school_line(value):
+        return True
+    if (
+        len(value) <= 90
+        and COMPANY_SIGNAL_RE.search(value)
+        and not ROLE_OR_ACHIEVEMENT_RE.search(value)
+        and not re.search(r"[\u3002\uff1b;]", value)
+    ):
+        return True
+    return False
+
+
+def _looks_like_education_school_line(line: str) -> bool:
+    value = re.sub(r"\s+", " ", str(line or "").strip())
+    if not value or len(value) > 90:
+        return False
+    if re.search(r"\u533b\u9662|\u8d1f\u8d23|\u9879\u76ee|\u5ba2\u6237|\u56e2\u961f|\u9500\u552e", value):
+        return False
+    return bool(
+        re.search(r"\u5927\u5b66|\u5b66\u9662|\u5b66\u6821|\u79d1\u5927|\b(?:university|college|school)\b", value, re.IGNORECASE)
+    )
+
+
+def _is_period_only_line(line: str) -> bool:
+    value = str(line or "").strip()
+    if not value:
+        return False
+    for pattern in (PERIOD_RE, ENGLISH_TO_PERIOD_RE, PARTIAL_CURRENT_PERIOD_RE):
+        match = pattern.fullmatch(value)
+        if match:
+            return True
+    return False
 
 
 def _repair_utf8_decoded_as_gbk(text: str) -> str:
@@ -367,7 +487,9 @@ def _explode_resume_line(block: str) -> list[str]:
     if not value:
         return []
     value = re.sub(r"\s*\|\s*", "\n", value)
-    value = re.sub(rf"(?<!^)\s*({SECTION_LABEL_PATTERN})(?=\s|$)", r"\n\1\n", value)
+    # Inline headings must be separated from the preceding content. Using
+    # ``\s*`` here split normal phrases such as "最高荣誉 2 人次" at "荣誉".
+    value = re.sub(rf"(?<!^)\s+({SECTION_LABEL_PATTERN})(?=\s|$)", r"\n\1\n", value)
     value = re.sub(rf"^({SECTION_LABEL_PATTERN})(?=\s+)", r"\1\n", value)
     value = re.sub(rf"(?<!^)\s*((?:{FIELD_LABEL_PATTERN})\s*[:\uff1a])", r"\n\1", value)
     value = re.sub(
@@ -426,7 +548,8 @@ def _refine_sections(sections: dict[str, list[str]], lines: list[str]) -> dict[s
         key = _classify_resume_line(line, original_key, active)
         if key:
             refined.setdefault(key, []).append(line)
-            if not (original_key == "experience" and key in {"personal", "education", "intention"}):
+            explicit_school = key == "education" and _looks_like_education_school_line(line)
+            if explicit_school or not (original_key == "experience" and key in {"personal", "education", "intention"}):
                 active = key if key != "personal" else active
 
     return {key: _unique(value, 240) for key, value in refined.items() if value}
@@ -481,6 +604,10 @@ def _classify_resume_line(line: str, original_key: str, active: str) -> str:
         return "personal"
     if original_key in {"projects", "certificates"}:
         return original_key
+    if _looks_like_education_school_line(line):
+        return "education"
+    if active == "education" and _is_period_only_line(line):
+        return "education"
     if _has_explicit_experience_signal(line, lower):
         return "experience"
     if original_key in {"personal", "intention", "summary", "projects", "skills", "education", "certificates"}:

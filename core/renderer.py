@@ -477,6 +477,10 @@ class ReportRenderer:
             next_heading("Work Experience / 工作经历", page_break_before=True)
             self._doc_experience_groups_v3(doc, ctx["appendix_blocks"]["experience_groups"], primary, ink)
 
+        if ctx["appendix_blocks"].get("education"):
+            next_heading("Education / 教育经历")
+            self._doc_bullets(doc, ctx["appendix_blocks"]["education"], primary)
+
         if ctx["job_description"]:
             next_heading("Role Requirement Notes / JD 要求")
             self._text_box_v3(doc, str(ctx["job_description"]), hairline)

@@ -315,11 +315,27 @@ def _education_items(sections: dict[str, list[str]]) -> list[str]:
             candidates.append(item)
 
     cleaned: list[str] = []
-    for item in _clean_items(candidates, limit=40):
+    paired_candidates = _pair_school_period_lines(_clean_items(candidates, limit=40))
+    for item in paired_candidates:
         if _looks_like_personal_value_line(item) and not _looks_like_education_line(item):
             continue
         cleaned.append(item)
     return _clean_items(cleaned, limit=12)
+
+
+def _pair_school_period_lines(items: list[str]) -> list[str]:
+    result: list[str] = []
+    index = 0
+    while index < len(items):
+        item = str(items[index] or "").strip()
+        next_item = str(items[index + 1] or "").strip() if index + 1 < len(items) else ""
+        if _looks_like_school_name_line(item) and next_item and _line_is_mostly_period(next_item):
+            result.append(f"{item} {next_item}")
+            index += 2
+            continue
+        result.append(item)
+        index += 1
+    return result
 
 
 def _project_items(sections: dict[str, list[str]]) -> list[str]:
@@ -453,6 +469,8 @@ def _experience_groups(items: list[str]) -> list[dict[str, Any]]:
         if period:
             remainder = remainder.replace(period, "", 1).strip(" -|\uff1a:")
         company = _extract_company(remainder)
+        if company and not period and current_role is not None and _looks_like_responsibility_sentence(remainder):
+            company = ""
         if not company and period:
             company, business_line = _split_astrazeneca_business_line(remainder)
             if company:
@@ -1257,6 +1275,8 @@ def _looks_like_suffixless_company_name(text: str) -> bool:
         return False
     if PROFILE_FIELD_RE.match(value) or _is_generic_company(value):
         return False
+    if _looks_like_managerial_role_title(value):
+        return False
     if _looks_like_business_object_not_company(value):
         return False
     if _looks_like_role_title(value) or _looks_like_detail(value):
@@ -1269,6 +1289,21 @@ def _looks_like_suffixless_company_name(text: str) -> bool:
             r"\u8bfa\u548c\u8bfa\u5fb7|\u963f\u65af\u5229\u5eb7|\u8f89\u745e|\u6768\u68ee|\u96c0\u5de2|\u9ad8\u9732\u6d01|"
             r"[（(][A-Za-z][A-Za-z .,&-]+[)）]",
             value,
+        )
+    )
+
+
+def _looks_like_managerial_role_title(text: str) -> bool:
+    value = re.sub(r"\s+", " ", str(text or "").strip(" -|\uff1a:"))
+    if not value:
+        return False
+    return bool(
+        re.search(
+            r"(?:\u7ecf\u7406|\u603b\u76d1|\u8d1f\u8d23\u4eba|\u4e3b\u7ba1|\u4ee3\u8868|\u4e3b\u4efb|\u603b\u88c1|\u526f\u603b|"
+            r"manager|director|head|lead|officer|specialist|representative)"
+            r"(?:\s*[\uff08(][A-Za-z0-9 ,/&.-]+[)\uff09])?\s*$",
+            value,
+            re.IGNORECASE,
         )
     )
 
@@ -1433,9 +1468,20 @@ def _looks_like_education_line(text: str) -> bool:
     value = re.sub(r"\s+", " ", str(text or "").strip(" -|\uff1a:"))
     if not value:
         return False
-    if re.search(r"\u5927\u5b66|\u5b66\u9662|\u4e2d\u5b66|\u5b66\u6821|\u6bd5\u4e1a\u9662\u6821|\u5b66\u5386|\u5b66\u4f4d|\u4e13\u4e1a|\u6559\u80b2\u7ecf\u5386|\u751f\u7269\u5de5\u7a0b", value):
+    if re.search(r"\u5927\u5b66|\u5b66\u9662|\u4e2d\u5b66|\u5b66\u6821|\u79d1\u5927|\u6bd5\u4e1a\u9662\u6821|\u5b66\u5386|\u5b66\u4f4d|\u4e13\u4e1a|\u6559\u80b2\u7ecf\u5386|\u751f\u7269\u5de5\u7a0b", value):
         return True
     return bool(re.search(r"\b(?:university|college|school|education|degree|bachelor|master|major)\b", value, re.IGNORECASE))
+
+
+def _looks_like_school_name_line(text: str) -> bool:
+    value = re.sub(r"\s+", " ", str(text or "").strip(" -|\uff1a:"))
+    if not value or len(value) > 90:
+        return False
+    if re.search(r"\u533b\u9662|\u8d1f\u8d23|\u9879\u76ee|\u5ba2\u6237|\u56e2\u961f|\u9500\u552e", value):
+        return False
+    return bool(
+        re.search(r"\u5927\u5b66|\u5b66\u9662|\u5b66\u6821|\u79d1\u5927|\b(?:university|college|school)\b", value, re.IGNORECASE)
+    )
 
 
 def _looks_like_personal_value_line(text: str) -> bool:
@@ -1676,6 +1722,17 @@ def _looks_like_detail(text: str) -> bool:
             r"\u8d1f\u8d23|\u8fbe\u6210|\u589e\u957f|\u4fdd\u7559|\u63a8\u5e7f|\u51c6\u5165|"
             r"\u56e2\u961f|\u5ba2\u6237|\u5e02\u573a|\u4ea7\u54c1|\u533b\u9662|\u5165\u9009|\u6210\u4e3a|\d+%",
             text,
+        )
+    )
+
+
+def _looks_like_responsibility_sentence(text: str) -> bool:
+    value = re.sub(r"\s+", " ", str(text or "").strip())
+    return bool(
+        re.search(
+            r"[:\uff1a\uff1b;\u3002]|\u8d1f\u8d23|\u5e26\u9886|\u642d\u5efa|\u5236\u5b9a|\u5b8c\u6210|\u63d0\u5347|\u8fbe\u6210|"
+            r"\u5f00\u53d1|\u7ef4\u62a4|\u63a8\u52a8|\u8986\u76d6|\u5efa\u7acb|\u4f18\u5316|\u5b9e\u73b0|\u8d85\u989d",
+            value,
         )
     )
 
