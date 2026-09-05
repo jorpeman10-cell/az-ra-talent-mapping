@@ -176,3 +176,72 @@ def next_version(t: dict) -> dict:
     t2 = copy.deepcopy(t)
     t2["version"] = t.get("version", 1) + 1
     return t2
+
+
+# ---------- scoring ----------
+
+# verify coefficient map keyed by rounded-down face-eval performance score
+VERIFY_COEF = {5: 1.0, 4: 0.9, 3: 0.8, 2: 0.65, 1: 0.5}
+
+
+def _qmap(t, role):
+    """{(dim_id, qid): question} for the given role."""
+    out = {}
+    for d in t["dimensions"]:
+        for q in d.get(f"{role}_questions", []):
+            out[(d["id"], q["id"])] = q
+    return out
+
+
+def score_questionnaire(t: dict, responses: dict, role: str) -> dict:
+    """Score one questionnaire (role='self'|'hr').
+
+    Rules:
+    - dimension score = mean of its choice-question scores (1-5); number/multi/text are captured, not scored
+    - dimension with no choice questions (self 'performance') gets neutral 5.0
+    - missing choice answer -> that dimension score 0 and missing=True (engine blocks assess)
+    - redline=True if any chosen option has redline=True
+    """
+    assert role in ("self", "hr")
+    result = {
+        "role": role,
+        "template_version": t["version"],
+        "dimensions": {}, "claimed_billing_wan": None,
+        "domain_tags": [], "redline": False,
+    }
+    for d in t["dimensions"]:
+        scores, answers, missing = [], {}, False
+        for q in d.get(f"{role}_questions", []):
+            ans = responses.get(q["id"])
+            answers[q["id"]] = ans
+            if q["type"] == "choice":
+                if ans is None:
+                    missing = True
+                    continue
+                opt = next((o for o in q["options"] if o["label"] == ans), None)
+                if opt is None:
+                    missing = True
+                    continue
+                scores.append(float(opt["score"]))
+                if opt.get("redline"):
+                    result["redline"] = True
+            elif q["type"] == "number" and isinstance(ans, (int, float)):
+                if q["id"] == "perf_amount":
+                    result["claimed_billing_wan"] = float(ans)
+            elif q["type"] == "multi" and isinstance(ans, list):
+                if q["id"] == "dom_tags":
+                    result["domain_tags"] = [str(x) for x in ans]
+        entry = {"score": round(sum(scores) / len(scores), 2) if scores else 5.0,
+                 "answers": answers}
+        if missing:
+            entry["score"] = 0
+            entry["missing"] = True
+        result["dimensions"][d["id"]] = entry
+    return result
+
+
+def verify_coefficient(hr_result: dict) -> float:
+    """Map HR performance dimension score (1-5) to a verification coefficient."""
+    score = hr_result["dimensions"]["performance"]["score"]
+    step = min(5, max(1, int(score)))  # floor to nearest whole step
+    return VERIFY_COEF[step]
