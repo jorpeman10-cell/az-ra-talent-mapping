@@ -59,6 +59,23 @@ Agent 直接问"于肖肖的调薪幅度"即可获得计算结果+判断依据�
 1. 独立注册：`.mcp.json` 加 `"headhunt-decision": {"type":"http","url":"http://<host>:18802/mcp"}`（本机已注册）
 2. 并入 hiijob 网关：`gateway_patch/headhunt_tools.py` 的 3 个函数粘进 `federation_gateway/mcp_server.py`，装饰器换成网关的 `mcp` 实例；工具内部 HTTP 调 headhunt-svc，地址用 `HEADHUNT_API` 环境变量覆盖
 
+## 外部顾问评估（M3, P1）
+
+- 端点：`POST /api/candidate/intake` · `GET /api/q/{token}/template` · `POST /api/q/{token}/submit` ·
+  `POST /api/candidate/{cid}/hr-assess` · `POST /api/candidate/{cid}/assess` ·
+  `GET /api/candidates` · `GET /api/candidate/{cid}` · `GET/PUT /api/template`
+- 页面：`/q/{token}`（候选人自评，48h 单次 token，页面自行渲染过期/失效友好状态）· `/template`（HR 编辑器，发布即版本+1 并归档旧版到 `data/templates/v{N}.json`）
+- 存档：`/app/data/candidates/{cid}/`（profile / self_assess / hr_assess / assessment_{ts}，多版本留痕）
+- HR 配置（服务器 `config/` volume 内维护）：
+  - `questionnaire_template.json`：当前问卷模板（首访自动生成默认版）
+  - `candidate_grade_map.json`：顾问→职级映射（定薪带宽的内部样本来源，P3 实弹前必须填）
+  - `market_anchors.json`：分级市场底薪锚点（一期手录，二期谷露简历分位库替换）
+- 引擎：`candidate/questionnaire.py` + `candidate/engine.py`（自 `headhunt_model/step6/step7` 同步，双侧同改防漂移；空内部样本时带宽输出 `no_internal_data` 护栏）
+- 测试：`py -3 -m pytest tests/ -q`（candidate golden 与 board golden 同套跑，25 项）
+- 环境变量（可选覆盖）：`HEADHUNT_DATA_DIR`（存档根）、`HEADHUNT_CONFIG_DIR`（模板/配置）、`HEADHUNT_SALARY_CSV`（内部样本薪资表）
+- 公网说明：候选人自评链接外发需在宿主 nginx 加 `/q/` 与 `/api/q/` 的 location 反代到 18801（与 hiijob.cn 域名/证书规划一起定）
+
+
 ## 部署到 hiijob pro 服务器
 
 ```bash
