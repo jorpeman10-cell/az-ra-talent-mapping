@@ -82,11 +82,15 @@ def up(client):
     run(client, f"cd {REMOTE_DIR} && docker build -t headhunt-svc:local . 2>&1 | tail -5", timeout=1800)
     # 独立起两个容器(不并入主 compose, 零侵入)
     run(client, "docker rm -f headhunt-svc headhunt-mcp 2>/dev/null || true")
+    # 2026-09-05: 必须并入 lobe-network——federation 网关经 HEADHUNT_API=http://headhunt-svc:18801
+    # 在该网络内按容器名访问; 脱离该网络网关全部 headhunt 能力会断
     run(client, f"docker run -d --name headhunt-svc --restart unless-stopped "
+                f"--network lobehubaliyundeploy_lobe-network "
                 f"-p 18801:18801 --env-file {REMOTE_DIR}/config/.env "
                 f"-v {REMOTE_DIR}/data:/app/data -v {REMOTE_DIR}/config:/app/config "
                 f"headhunt-svc:local")
     run(client, f"docker run -d --name headhunt-mcp --restart unless-stopped "
+                f"--network lobehubaliyundeploy_lobe-network "
                 f"-p 18802:18802 --env-file {REMOTE_DIR}/config/.env "
                 f"-v {REMOTE_DIR}/data:/app/data -v {REMOTE_DIR}/config:/app/config "
                 f"headhunt-svc:local python -m mcp_ext.server")
