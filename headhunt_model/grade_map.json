@@ -1,0 +1,4 @@
+{
+  "_comment": "HR-maintained advisor->grade mapping (name must match salary_detail.csv). Fill before P3 live run.",
+  "mapping": {}
+}

@@ -97,3 +97,92 @@ def level_candidate(self_res: dict, hr_res: dict) -> dict:
         "rationale": rationale or ["no modifiers applied"],
         "warnings": [],
     }
+
+
+# ---------- salary / breakeven ----------
+
+AFTER_TAX = 0.936            # after-tax coefficient on billing for commission base
+COMMISSION_LADDER = ((40, 0.30), (60, 0.32), (100, 0.35), (150, 0.38), (200, 0.40), (float("inf"), 0.45))
+INTERNAL_ANCHOR_BLEND = 0.6  # 60% internal, 40% market anchor
+
+
+def tier(billing_wan: float) -> float:
+    for cap, rate in COMMISSION_LADDER:
+        if billing_wan <= cap:
+            return rate
+    return 0.45
+
+
+def _annual_cost_wan(monthly: float, billing_wan: float, insurance_pct: float, overhead_wan: float) -> float:
+    """Total company cost: cash comp = max(base, after-tax billing x tier) + social + overhead."""
+    base_wan = monthly * 12 / 10000.0
+    cash = max(base_wan, AFTER_TAX * billing_wan * tier(billing_wan))
+    social = base_wan * insurance_pct / 100.0
+    return cash + social + overhead_wan
+
+
+def breakeven_billing(monthly: float, insurance_pct: float = 28.0, overhead_wan: float = 6.37) -> float:
+    """Smallest annual billing (wan, step 1) where profit >= 0."""
+    B = 1.0
+    while B < 10000.0:
+        if B - _annual_cost_wan(monthly, B, insurance_pct, overhead_wan) >= 0:
+            return round(B, 2)
+        B += 1.0
+    return float("inf")
+
+
+def quick_npv(monthly: float, billing_wan: float, years: int = 3, discount: float = 0.12,
+              insurance_pct: float = 28.0, overhead_wan: float = 6.37) -> float:
+    """Flat-billing 3-year NPV feasibility check (wan)."""
+    npv = 0.0
+    for y in range(1, years + 1):
+        profit = billing_wan - _annual_cost_wan(monthly, billing_wan, insurance_pct, overhead_wan)
+        npv += profit / ((1 + discount) ** y)
+    return round(npv, 2)
+
+
+def _pct(values):
+    """P25/P50/P75 of monthly salaries. P50 uses the true median so a
+    two-sample grade (e.g. [20000, 22000]) yields 21000, not 20000."""
+    s = sorted(values)
+    n = len(s)
+    p25 = s[min(n - 1, int(0.25 * (n - 1)))]
+    p50 = (s[n // 2] if n % 2 == 1 else (s[n // 2 - 1] + s[n // 2]) / 2.0)
+    p75 = s[min(n - 1, int(0.75 * (n - 1)))]
+    return p25, p50, p75
+
+
+def salary_band(grade: str, internal_samples: dict, anchors: dict) -> dict:
+    """Salary band for a grade. Blend internal percentiles with market anchors 6:4.
+
+    - internal samples pooled from grade +/-1 when the exact grade is empty
+    - no anchor -> internal only, confidence LOW (external candidates cap at MEDIUM)
+    """
+    samples = list(internal_samples.get(grade, []))
+    source = "internal" if samples else "interpolated"
+    if not samples:
+        for g, idx in GRADE_INDEX.items():
+            if abs(idx - GRADE_INDEX[grade]) == 1:
+                samples.extend(internal_samples.get(g, []))
+    if not samples:  # last resort: whole pool
+        for v in internal_samples.values():
+            samples.extend(v)
+    p25, p50, p75 = _pct(samples)
+    conf = "MEDIUM" if len(internal_samples.get(grade, [])) >= 2 else "LOW"
+    anchor = anchors.get(grade)
+    if anchor:
+        p25 = round(INTERNAL_ANCHOR_BLEND * p25 + (1 - INTERNAL_ANCHOR_BLEND) * anchor["p25"])
+        p50 = round(INTERNAL_ANCHOR_BLEND * p50 + (1 - INTERNAL_ANCHOR_BLEND) * anchor["p50"])
+        p75 = round(INTERNAL_ANCHOR_BLEND * p75 + (1 - INTERNAL_ANCHOR_BLEND) * anchor["p75"])
+        source = "blend"
+        conf = "MEDIUM"
+    return {"p25": p25, "p50": p50, "p75": p75, "source": source, "confidence": conf}
+
+
+def load_internal_samples(salary_map: dict, grade_map: dict) -> dict:
+    """salary_loader {name: {'base_monthly':..}} x {name: grade} -> {grade: [monthly,..]}."""
+    out = {}
+    for name, grade in grade_map.items():
+        if name in salary_map:
+            out.setdefault(grade, []).append(salary_map[name]["base_monthly"])
+    return out

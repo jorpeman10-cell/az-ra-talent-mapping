@@ -1,0 +1,4 @@
+{
+  "_comment": "HR-maintained per-grade market monthly-salary anchors {grade: {p25,p50,p75}}. Fill before P3 live run.",
+  "anchors": {}
+}
