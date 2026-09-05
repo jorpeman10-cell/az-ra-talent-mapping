@@ -39,16 +39,21 @@ let T = null, NAME = "", answers = {};
 
 async function boot() {
   const token = location.pathname.split("/q/")[1];
-  const r = await fetch(`/api/q/${token}/template`);
-  if (!r.ok) {
-    const why = {"expired": "链接已过期（48小时有效），请联系 HR 重新发送",
-                 "already_submitted": "问卷已提交，无需重复填写"}[r.json().detail] || "链接无效";
-    document.getElementById("app").innerHTML = `<div class="state">${why}</div>`;
-    return;
+  try {
+    const r = await fetch(`/api/q/${token}/template`);
+    if (!r.ok) {
+      const why = {"expired": "链接已过期（48小时有效），请联系 HR 重新发送",
+                   "already_submitted": "问卷已提交，无需重复填写"}[r.json().detail] || "链接无效";
+      document.getElementById("app").innerHTML = `<div class="state">${why}</div>`;
+      return;
+    }
+    const j = await r.json();
+    T = j.template; NAME = j.candidate_name;
+    render();
+  } catch (e) {
+    document.getElementById("app").innerHTML =
+      `<div class="state">服务暂时不可用，请稍后刷新重试</div>`;
   }
-  const j = await r.json();
-  T = j.template; NAME = j.candidate_name;
-  render();
 }
 function render() {
   let html = `<h1>顾问自评问卷</h1><div class="sub">${NAME} · 请如实填写，约 10 分钟</div>`;

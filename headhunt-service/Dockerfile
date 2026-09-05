@@ -5,6 +5,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY pipeline/ pipeline/
+COPY candidate/ candidate/
 COPY api/ api/
 COPY web/ web/
 COPY jobs/ jobs/

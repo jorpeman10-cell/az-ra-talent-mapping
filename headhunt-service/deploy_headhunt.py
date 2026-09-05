@@ -99,7 +99,11 @@ def up(client):
 def verify(client):
     time.sleep(8)
     run(client, "docker ps --filter name=headhunt --format '{{.Names}} {{.Status}}'")
-    run(client, "curl -s http://127.0.0.1:18801/api/board | head -c 300; echo")
+    run(client, "curl -sf http://127.0.0.1:18801/api/board -o /tmp/board_smoke.json && "
+                "head -c 300 /tmp/board_smoke.json; echo")
+    run(client, "curl -sf -X POST http://127.0.0.1:18801/api/candidate/intake "
+                "-H 'Content-Type: application/json' -d '{\"name\":\"deploy-smoke\"}' "
+                "-o /tmp/intake_smoke.json && grep -o '\"self_url\"' /tmp/intake_smoke.json")
     run(client, "curl -s -X POST http://127.0.0.1:18802/mcp -H 'Content-Type: application/json' "
                 "-H 'Accept: application/json, text/event-stream' "
                 "-d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{}}' | head -c 500; echo")
