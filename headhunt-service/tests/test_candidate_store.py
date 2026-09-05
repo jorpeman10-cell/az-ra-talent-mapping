@@ -58,6 +58,15 @@ def test_list_candidates():
     assert "甲" in names and "乙" in names
 
 
+def test_list_status_derived_not_stale():
+    # Summary status must come from derive_status(rec), not the stored field
+    # (the stored field goes stale when timestamps change without rewrite).
+    rec = store.new_candidate("丁七")
+    store.update(rec["cid"], self_submitted_at="t")
+    row = next(c for c in store.list_candidates() if c["cid"] == rec["cid"])
+    assert row["status"] == "SELF_DONE"   # not the stored "CREATED"
+
+
 if __name__ == "__main__":
     for n, f in sorted(list(globals().items())):
         if n.startswith("test_"):

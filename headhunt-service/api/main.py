@@ -168,3 +168,139 @@ def api_rerun(fresh: bool = False):
 def api_pipeline_rerun(fresh: bool = False):
     """网关 executor 约定的 rerun 路径别名 (gateway executor RERUN_PATH)"""
     return api_rerun(fresh)
+
+
+# ===================== 外部顾问评估 (M3, P1) =====================
+import re
+from datetime import timezone
+
+from candidate.store import (new_candidate, get as get_candidate,
+                             update as update_candidate, list_candidates,
+                             validate_token, save_json, load_json,
+                             derive_status, CONFIG_DIR)
+from candidate.questionnaire import default_template, validate_template, score_questionnaire
+
+TEMPLATE_PATH = os.path.join(CONFIG_DIR, "questionnaire_template.json")
+
+# cid format: 'c' + 14-digit timestamp + 4 hex chars; guards path traversal
+CID_RE = re.compile(r"^c\d{14}[0-9a-f]{4}$")
+
+
+def _get_checked(cid):
+    if not CID_RE.match(cid):
+        raise HTTPException(422, "bad cid format")
+    rec = get_candidate(cid)
+    if rec is None:
+        raise HTTPException(404, f"candidate {cid} not found")
+    return rec
+
+
+def load_template():
+    """Current questionnaire template; seeds from default on first call."""
+    if not os.path.isfile(TEMPLATE_PATH):
+        t = default_template()
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        with open(TEMPLATE_PATH, "w", encoding="utf-8") as f:
+            json.dump(t, f, ensure_ascii=False, indent=1)
+        return t
+    with open(TEMPLATE_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_template(t):
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    with open(TEMPLATE_PATH, "w", encoding="utf-8") as f:
+        json.dump(t, f, ensure_ascii=False, indent=1)
+
+
+class IntakeIn(BaseModel):
+    name: str
+    target_line: str = ""
+    notes: str = ""
+
+
+class SubmitIn(BaseModel):
+    answers: dict
+
+
+class HrAssessIn(BaseModel):
+    answers: dict
+    interviewer: str = ""
+
+
+def _token_http_error(reason):
+    return HTTPException(410 if reason in ("expired", "already_submitted") else 404, reason)
+
+
+@app.post("/api/candidate/intake")
+def api_candidate_intake(body: IntakeIn):
+    if not body.name.strip():
+        raise HTTPException(422, "name required")
+    rec = new_candidate(body.name.strip(), body.target_line, body.notes)
+    return {"cid": rec["cid"], "name": rec["name"], "status": rec["status"],
+            "self_url": f"/q/{rec['token']}", "expires_at": rec["token_expires_at"]}
+
+
+@app.get("/q/{token}")
+def q_page(token: str):
+    cid, reason = validate_token(token)
+    if not cid:
+        raise _token_http_error(reason)
+    return FileResponse(os.path.join(BASE, "web", "q.html"))
+
+
+@app.get("/api/q/{token}/template")
+def api_q_template(token: str):
+    cid, reason = validate_token(token)
+    if not cid:
+        raise _token_http_error(reason)
+    rec = get_candidate(cid)
+    return {"candidate_name": rec["name"], "expires_at": rec["token_expires_at"],
+            "template": load_template()}
+
+
+@app.post("/api/q/{token}/submit")
+def api_q_submit(token: str, body: SubmitIn):
+    cid, reason = validate_token(token)
+    if not cid:
+        raise _token_http_error(reason)
+    result = score_questionnaire(load_template(), body.answers, "self")
+    save_json(cid, "self_assess.json", {"scored": result, "answers": body.answers})
+    update_candidate(cid, self_submitted_at=datetime.now(timezone.utc).isoformat(),
+                     status="SELF_DONE")
+    return {"ok": True, "status": "SELF_DONE"}
+
+
+@app.post("/api/candidate/{cid}/hr-assess")
+def api_hr_assess(cid: str, body: HrAssessIn):
+    _get_checked(cid)
+    result = score_questionnaire(load_template(), body.answers, "hr")
+    save_json(cid, "hr_assess.json",
+              {"scored": result, "answers": body.answers, "interviewer": body.interviewer,
+               "submitted_at": datetime.now(timezone.utc).isoformat()})
+    update_candidate(cid, hr_submitted_at=datetime.now(timezone.utc).isoformat(),
+                     status="HR_DONE")
+    return {"ok": True, "status": derive_status(get_candidate(cid))}
+
+
+@app.get("/api/candidates")
+def api_candidates():
+    return {"candidates": list_candidates()}
+
+
+@app.get("/api/candidate/{cid}")
+def api_candidate_detail(cid: str):
+    rec = _get_checked(cid)
+    rec["status"] = derive_status(rec)
+    latest = None
+    for fname in sorted(os.listdir(store_dir(cid)), reverse=True):
+        if fname.startswith("assessment_") and fname.endswith(".json"):
+            latest = load_json(cid, fname)
+            break
+    return {"profile": rec, "self_assess": load_json(cid, "self_assess.json"),
+            "hr_assess": load_json(cid, "hr_assess.json"), "latest_assessment": latest}
+
+
+def store_dir(cid):
+    from candidate.store import CANDIDATES_DIR
+    return os.path.join(CANDIDATES_DIR, cid)

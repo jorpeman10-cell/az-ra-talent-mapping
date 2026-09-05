@@ -77,8 +77,10 @@ def list_candidates():
     for cid in sorted(os.listdir(CANDIDATES_DIR)):
         rec = get(cid)
         if rec:
-            out.append({k: rec.get(k) for k in ("cid", "name", "status", "created_at",
-                                                "self_submitted_at", "hr_submitted_at", "assessed_at")})
+            # status is derived, not read from the stored field (it goes stale)
+            out.append({k: rec.get(k) for k in ("cid", "name", "created_at",
+                                                "self_submitted_at", "hr_submitted_at", "assessed_at")}
+                       | {"status": derive_status(rec)})
     return out
 
 
