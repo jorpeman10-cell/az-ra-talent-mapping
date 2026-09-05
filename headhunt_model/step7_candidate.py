@@ -249,3 +249,19 @@ def assess(bundle: dict) -> dict:
         "confidence": band["confidence"],
         "warnings": warnings,
     }
+
+
+if __name__ == "__main__":
+    # CLI smoke entry: python step7_candidate.py <bundle.json> [out.json]
+    import json as _json, sys as _sys
+    if len(_sys.argv) < 2:
+        print("usage: python step7_candidate.py <bundle.json> [out.json]")
+        _sys.exit(2)
+    with open(_sys.argv[1], encoding="utf-8") as _f:
+        _bundle = _json.load(_f)
+    _out = assess(_bundle)
+    _txt = _json.dumps(_out, ensure_ascii=False, indent=1)
+    print(_txt)
+    if len(_sys.argv) > 2:
+        with open(_sys.argv[2], "w", encoding="utf-8") as _f:
+            _f.write(_txt)
