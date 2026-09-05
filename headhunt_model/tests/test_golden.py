@@ -1,8 +1,7 @@
 # tests/test_golden.py
 # Golden regression: assess() output must match frozen fixtures exactly.
-import json, os, sys, io
+import json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 from step7_candidate import assess
 
 BASE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fixtures")

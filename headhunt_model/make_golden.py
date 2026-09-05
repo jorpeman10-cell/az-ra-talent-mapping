@@ -2,8 +2,7 @@
 """Regenerate golden fixtures: python make_golden.py [--update].
 Reads fixtures/inputs/*.json (assess bundles), writes/compares fixtures/expected/*.json.
 """
-import json, os, sys, io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+import json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from step7_candidate import assess
 

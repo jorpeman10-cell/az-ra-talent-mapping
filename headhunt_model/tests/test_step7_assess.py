@@ -69,6 +69,13 @@ def test_assess_blocks_incomplete_questionnaire():
     assert out["status"] == "ERROR"
     assert any("missing" in w for w in out["warnings"])
 
+def test_assess_blocks_missing_claim():
+    b = base_bundle()
+    b["self"]["claimed_billing_wan"] = None
+    out = assess(b)
+    assert out["status"] == "ERROR"
+    assert any("claimed billing" in w for w in out["warnings"])
+
 def test_high_divergence_extra_discount():
     # 3 divergent dimensions WITHOUT triggering downgrades (hr scores exactly 3):
     # perf self5/hr3, domain self5/hr3, speed self5/hr3 -> high divergence,

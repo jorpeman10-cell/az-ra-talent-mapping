@@ -217,6 +217,9 @@ def assess(bundle: dict) -> dict:
         for dim, entry in res["dimensions"].items():
             if entry.get("missing"):
                 warnings.append(f"{role} questionnaire incomplete: dimension '{dim}' has missing answers")
+    # guard: self questionnaire must state the claimed billing (spec: no blank perf_amount)
+    if self_res.get("claimed_billing_wan") is None:
+        warnings.append("self questionnaire incomplete: claimed billing (perf_amount) not answered")
     # guard: absurd claim
     if (self_res.get("claimed_billing_wan") or 0) > CLAIM_ABSURD_WAN:
         warnings.append(f"claimed billing {self_res.get('claimed_billing_wan')} wan exceeds "
