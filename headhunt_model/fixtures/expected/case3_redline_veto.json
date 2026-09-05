@@ -1,0 +1,47 @@
+{
+ "status": "REJECT_REVIEW",
+ "leveling": {
+  "status": "REJECT_REVIEW",
+  "grade": null,
+  "base_grade": null,
+  "effective_billing_wan": null,
+  "verify_coefficient": null,
+  "rationale": [
+   "compliance redline triggered in questionnaire"
+  ],
+  "warnings": []
+ },
+ "line_match": {
+  "lines": [
+   {
+    "line": "肿瘤线",
+    "overlap_pct": 70.0
+   },
+   {
+    "line": "综合线",
+    "overlap_pct": 15.0
+   },
+   {
+    "line": "糖尿病线",
+    "overlap_pct": 0.0
+   },
+   {
+    "line": "中枢神经线",
+    "overlap_pct": 0.0
+   },
+   {
+    "line": "器械线",
+    "overlap_pct": 0.0
+   }
+  ],
+  "top_line": "肿瘤线",
+  "top_overlap_pct": 70.0
+ },
+ "divergence": {
+  "divergent": [
+   "compliance"
+  ],
+  "high_divergence": false
+ },
+ "warnings": []
+}

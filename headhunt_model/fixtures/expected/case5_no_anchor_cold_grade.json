@@ -1,0 +1,58 @@
+{
+ "status": "OK",
+ "leveling": {
+  "status": "OK",
+  "grade": "AC2",
+  "base_grade": "AC2",
+  "effective_billing_wan": 55.0,
+  "verify_coefficient": 1.0,
+  "rationale": [
+   "no modifiers applied"
+  ],
+  "warnings": []
+ },
+ "band": {
+  "p25": 15000,
+  "p50": 16000.0,
+  "p75": 15000,
+  "source": "interpolated",
+  "confidence": "LOW"
+ },
+ "breakeven_wan": 31.0,
+ "breakeven_monthly": 16000.0,
+ "npv_quick_at_target": 45.76,
+ "line_match": {
+  "lines": [
+   {
+    "line": "肿瘤线",
+    "overlap_pct": 70.0
+   },
+   {
+    "line": "综合线",
+    "overlap_pct": 15.0
+   },
+   {
+    "line": "糖尿病线",
+    "overlap_pct": 0.0
+   },
+   {
+    "line": "中枢神经线",
+    "overlap_pct": 0.0
+   },
+   {
+    "line": "器械线",
+    "overlap_pct": 0.0
+   }
+  ],
+  "top_line": "肿瘤线",
+  "top_overlap_pct": 70.0
+ },
+ "divergence": {
+  "divergent": [
+   "domain"
+  ],
+  "high_divergence": false
+ },
+ "confidence": "LOW",
+ "warnings": []
+}

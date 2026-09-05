@@ -1,0 +1,6 @@
+{
+ "status": "ERROR",
+ "warnings": [
+  "hr questionnaire incomplete: dimension 'domain' has missing answers"
+ ]
+}
