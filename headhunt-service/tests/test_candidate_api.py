@@ -47,7 +47,8 @@ def test_submit_self_then_token_dead():
 
 
 def test_bad_token_404():
-    assert client.get("/api/q/nope").status_code == 404
+    # page is always served; the API validates and reports the reason
+    assert client.get("/q/nope").status_code == 200
     assert client.get("/api/q/nope/template").status_code == 404
 
 

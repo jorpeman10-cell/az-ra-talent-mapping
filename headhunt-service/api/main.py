@@ -248,9 +248,9 @@ def api_candidate_intake(body: IntakeIn):
 
 @app.get("/q/{token}")
 def q_page(token: str):
-    cid, reason = validate_token(token)
-    if not cid:
-        raise _token_http_error(reason)
+    # Always serve the page; its JS calls /api/q/{token}/template which returns
+    # 410/404 with a reason, rendered as a friendly state. Validating here would
+    # show candidates raw JSON instead.
     return FileResponse(os.path.join(BASE, "web", "q.html"))
 
 
