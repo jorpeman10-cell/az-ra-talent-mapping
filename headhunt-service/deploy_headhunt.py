@@ -100,13 +100,18 @@ def verify(client):
     time.sleep(8)
     run(client, "docker ps --filter name=headhunt --format '{{.Names}} {{.Status}}'")
     run(client, "curl -sf http://127.0.0.1:18801/api/board -o /tmp/board_smoke.json && "
-                "head -c 300 /tmp/board_smoke.json; echo")
+                "head -c 300 /tmp/board_smoke.json || { echo 'BOARD SMOKE FAILED'; exit 1; }")
     run(client, "curl -sf -X POST http://127.0.0.1:18801/api/candidate/intake "
                 "-H 'Content-Type: application/json' -d '{\"name\":\"deploy-smoke\"}' "
                 "-o /tmp/intake_smoke.json && grep -o '\"self_url\"' /tmp/intake_smoke.json")
+    # clean up the smoke candidate so verify() never pollutes the archive
+    run(client, "SMOKE_CID=$(grep -o '\"cid\":\"[^\"]*\"' /tmp/intake_smoke.json | cut -d'\"' -f4); "
+                "rm -rf /root/headhunt-service/data/candidates/$SMOKE_CID "
+                "&& echo \"smoke candidate $SMOKE_CID removed\"")
     run(client, "curl -s -X POST http://127.0.0.1:18802/mcp -H 'Content-Type: application/json' "
                 "-H 'Accept: application/json, text/event-stream' "
-                "-d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{}}' | head -c 500; echo")
+                "-d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{}}' "
+                "-o /tmp/mcp_smoke.txt && head -c 500 /tmp/mcp_smoke.txt || { echo 'MCP SMOKE FAILED'; exit 1; }")
     run(client, "docker ps --format '{{.Names}} {{.RestartCount}}' | grep -v headhunt | awk '$2>0{c++} END{print \"non-headhunt containers with restarts:\", c+0}'")
 
 
