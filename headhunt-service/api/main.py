@@ -178,11 +178,14 @@ from candidate.store import (new_candidate, get as get_candidate,
                              update as update_candidate, list_candidates,
                              validate_token, save_json, load_json,
                              derive_status, CONFIG_DIR)
+from candidate.store import DATA_DIR as CAND_DATA_DIR
 from candidate.questionnaire import default_template, validate_template, score_questionnaire
 from candidate import engine as cand_engine
 from pipeline.loaders import load_salary_map
 
 TEMPLATE_PATH = os.path.join(CONFIG_DIR, "questionnaire_template.json")
+# History archive dir, kept next to candidate data (same source as store.DATA_DIR).
+DATA_DIR_TEMPLATES = os.path.join(CAND_DATA_DIR, "templates")
 
 # cid format: 'c' + 14-digit timestamp + 4 hex chars; guards path traversal
 CID_RE = re.compile(r"^c\d{14}[0-9a-f]{4}$")
@@ -350,3 +353,29 @@ def api_candidate_assess(cid: str):
     update_candidate(cid, assessed_at=datetime.now(timezone.utc).isoformat(),
                      status="ASSESSED")
     return out
+
+
+@app.get("/api/template")
+def api_template_get():
+    return load_template()
+
+
+@app.get("/template")
+def template_page():
+    return FileResponse(os.path.join(BASE, "web", "template.html"))
+
+
+@app.put("/api/template")
+def api_template_put(t: dict):
+    errors = validate_template(t)
+    if errors:
+        raise HTTPException(422, errors)
+    old = load_template()
+    t = dict(t)
+    t["version"] = old.get("version", 1) + 1   # server-controlled, never trust client
+    os.makedirs(os.path.join(DATA_DIR_TEMPLATES), exist_ok=True)
+    with open(os.path.join(DATA_DIR_TEMPLATES, f"v{old.get('version', 1)}.json"),
+              "w", encoding="utf-8") as f:
+        json.dump(old, f, ensure_ascii=False, indent=1)
+    save_template(t)
+    return {"saved": True, "version": t["version"]}

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>问卷模板编辑器 — 外部顾问评估</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+         background: #f5f6f8; color: #1a1a2e; }
+  header { background: #1a1a2e; color: #fff; padding: 18px 32px; display: flex;
+           justify-content: space-between; align-items: baseline; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header .meta { font-size: 12px; opacity: .7; }
+  .wrap { max-width: 900px; margin: 24px auto; padding: 0 20px; }
+  .card { background: #fff; border-radius: 10px; padding: 16px 20px; margin-bottom: 16px;
+          box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .dim-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+  .dim-head input[name=dim-name] { flex: 1; font-size: 15px; font-weight: 600;
+                                   border: none; border-bottom: 1px dashed #ccc; padding: 4px; }
+  .w { width: 90px; }
+  label { font-size: 13px; color: #555; }
+  .q { border-left: 3px solid #e8e8ef; padding: 8px 12px; margin: 8px 0; }
+  .q .label { width: 100%; border: 1px solid #e0e0e8; border-radius: 6px; padding: 6px 8px;
+              font-size: 13px; margin-bottom: 6px; }
+  .opts textarea { width: 100%; font-size: 12px; font-family: Consolas, monospace;
+                   border: 1px solid #e0e0e8; border-radius: 6px; padding: 6px; min-height: 68px; }
+  .hint { font-size: 12px; color: #999; margin-top: 4px; }
+  #sum { font-weight: 700; }
+  #sum.ok { color: #177245; } #sum.bad { color: #b03030; }
+  button.primary { background: #1a1a2e; color: #fff; border: none; border-radius: 8px;
+                   padding: 10px 28px; font-size: 14px; cursor: pointer; }
+  button.primary:disabled { opacity: .4; cursor: not-allowed; }
+  #msg { font-size: 13px; margin-left: 12px; }
+</style>
+</head>
+<body>
+<header><h1>问卷模板编辑器</h1><div class="meta">外部顾问评估 · 历史存档不受编辑影响</div></header>
+<div class="wrap">
+  <div class="card">
+    权重合计：<span id="sum">-</span>
+    <button class="primary" id="publish" style="float:right">发布新版本</button>
+    <span id="msg"></span>
+  </div>
+  <div id="dims"></div>
+</div>
+<script>
+let T = null;
+const $ = s => document.querySelector(s);
+
+// options textarea format: one per line, "label | score | redline(可选1)"
+function optsToText(opts, type) {
+  if (type !== "choice" && type !== "multi") return "";
+  return (opts || []).map(o => [o.label, o.score, o.redline ? 1 : ""].filter(x => x !== "")
+    .join(" | ")).join("\n");
+}
+function textToOpts(text) {
+  return text.split("\n").map(l => l.trim()).filter(Boolean).map(l => {
+    const parts = l.split("|").map(s => s.trim());
+    return {label: parts[0], score: Number(parts[1] || 0),
+            redline: parts[2] === "1"};
+  });
+}
+
+function render() {
+  $("#dims").innerHTML = "";
+  T.dimensions.forEach((d, di) => {
+    const card = document.createElement("div"); card.className = "card";
+    let html = `<div class="dim-head">
+      <input name="dim-name" value="${d.name}" data-di="${di}">
+      <span><label>权重</label> <input class="w" type="number" step="0.05" min="0" max="1"
+        value="${d.weight}" data-w="${di}"></span>
+      <span class="hint">id: ${d.id}（不可改）</span></div>`;
+    for (const role of ["self_questions", "hr_questions"]) {
+      html += `<h4 style="margin:10px 0 4px">${role === "self_questions" ? "自评卷" : "面评卷"}</h4>`;
+      d[role].forEach((q, qi) => {
+        html += `<div class="q">
+          <div style="font-size:11px;color:#999">${q.id} · ${q.type}</div>
+          <input class="label" value="${(q.label || "").replace(/"/g, "&quot;")}"
+                 data-role="${role}" data-di="${di}" data-qi="${qi}">
+          ${q.type === "choice" || q.type === "multi" ?
+            `<div class="opts"><textarea data-role="${role}" data-di="${di}" data-qi="${qi}"
+              >${optsToText(q.options, q.type)}</textarea>
+             <div class="hint">每行一个选项：文案 | 分值 | 1(红线,仅choice)</div></div>` : ""}`;
+      });
+    }
+    card.innerHTML = html;
+    $("#dims").appendChild(card);
+  });
+  $("#dims").querySelectorAll("[data-w]").forEach(el =>
+    el.addEventListener("input", () => { T.dimensions[+el.dataset.di].weight = +el.value; sum(); }));
+  $("#dims").querySelectorAll("[data-role][class=label]").forEach(el =>
+    el.addEventListener("input", () => {
+      T.dimensions[+el.dataset.di][el.dataset.role][+el.dataset.qi].label = el.value; }));
+  $("#dims").querySelectorAll("textarea[data-role]").forEach(el =>
+    el.addEventListener("input", () => {
+      T.dimensions[+el.dataset.di][el.dataset.role][+el.dataset.qi].options =
+        textToOpts(el.value); }));
+  $("#dims").querySelectorAll("[name=dim-name]").forEach(el =>
+    el.addEventListener("input", () => { T.dimensions[+el.dataset.di].name = el.value; }));
+  sum();
+}
+function sum() {
+  const s = T.dimensions.reduce((a, d) => a + (+d.weight || 0), 0);
+  $("#sum").textContent = (s * 100).toFixed(0) + "%";
+  $("#sum").className = Math.abs(s - 1) < 1e-6 ? "ok" : "bad";
+  $("#publish").disabled = Math.abs(s - 1) > 1e-6;
+}
+$("#publish").onclick = async () => {
+  $("#msg").textContent = "发布中…";
+  const r = await fetch("/api/template", {method: "PUT",
+    headers: {"Content-Type": "application/json"}, body: JSON.stringify(T)});
+  if (r.ok) { const j = await r.json(); $("#msg").textContent = "已发布 v" + j.version; }
+  else { const j = await r.json(); $("#msg").textContent = "被拒: " + JSON.stringify(j.detail); }
+};
+fetch("/api/template").then(r => r.json()).then(t => { T = t; render(); });
+</script>
+</body>
+</html>
