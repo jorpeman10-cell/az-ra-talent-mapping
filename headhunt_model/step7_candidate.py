@@ -186,3 +186,66 @@ def load_internal_samples(salary_map: dict, grade_map: dict) -> dict:
         if name in salary_map:
             out.setdefault(grade, []).append(salary_map[name]["base_monthly"])
     return out
+
+
+# ---------- line matching & divergence ----------
+# NOTE: LINE_PROFILES and line_match() are defined in the leveling section above
+# (apply_modifiers needs them); this section adds divergence and assess().
+
+CLAIM_ABSURD_WAN = 500.0  # claims above this are treated as data errors (3-sigma style guard)
+
+
+def divergence(self_res, hr_res):
+    divergent = []
+    for dim, entry in self_res["dimensions"].items():
+        if dim not in hr_res["dimensions"]:
+            continue
+        if abs(entry["score"] - hr_res["dimensions"][dim]["score"]) > 1.0:
+            divergent.append(dim)
+    return {"divergent": divergent, "high_divergence": len(divergent) >= 3}
+
+
+# ---------- full assessment ----------
+
+def assess(bundle: dict) -> dict:
+    """bundle = {"self", "hr", "internal_samples", "anchors"}. Deterministic end-to-end."""
+    self_res, hr_res = bundle["self"], bundle["hr"]
+    warnings = []
+
+    # guard: incomplete questionnaire
+    for role, res in (("self", self_res), ("hr", hr_res)):
+        for dim, entry in res["dimensions"].items():
+            if entry.get("missing"):
+                warnings.append(f"{role} questionnaire incomplete: dimension '{dim}' has missing answers")
+    # guard: absurd claim
+    if (self_res.get("claimed_billing_wan") or 0) > CLAIM_ABSURD_WAN:
+        warnings.append(f"claimed billing {self_res.get('claimed_billing_wan')} wan exceeds "
+                        f"{CLAIM_ABSURD_WAN} wan guard — HR must verify the number")
+    if warnings:
+        return {"status": "ERROR", "warnings": warnings}
+
+    lm = line_match(self_res.get("domain_tags", []))
+
+    div = divergence(self_res, hr_res)
+    if div["high_divergence"]:
+        self_res = dict(self_res, claimed_billing_wan=(self_res.get("claimed_billing_wan") or 0) * 0.9)
+
+    leveling = level_candidate(self_res, hr_res)
+    if leveling["status"] != "OK":
+        return {"status": leveling["status"], "leveling": leveling, "line_match": lm,
+                "divergence": div, "warnings": warnings}
+
+    band = salary_band(leveling["grade"], bundle.get("internal_samples", {}), bundle.get("anchors", {}))
+    monthly = float(band["p50"])
+    return {
+        "status": "OK",
+        "leveling": leveling,
+        "band": band,
+        "breakeven_wan": breakeven_billing(monthly),
+        "breakeven_monthly": monthly,
+        "npv_quick_at_target": quick_npv(monthly, GRADE_TARGETS[GRADE_INDEX[leveling["grade"]]][1]),
+        "line_match": lm,
+        "divergence": div,
+        "confidence": band["confidence"],
+        "warnings": warnings,
+    }
