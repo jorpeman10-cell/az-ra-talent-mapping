@@ -29,6 +29,17 @@ def test_redline_flag_only_on_choice():
     t["dimensions"][0]["self_questions"][0]["redline"] = True  # not allowed at question level
     assert any("redline" in e for e in validate_template(t))
 
+def test_unknown_dimension_id_rejected():
+    t = default_template()
+    t["dimensions"][0]["id"] = "bogus"
+    assert any("unknown dimension id" in e for e in validate_template(t))
+
+def test_option_level_redline_on_non_choice_rejected():
+    t = default_template()
+    q = next(q for q in t["dimensions"][1]["self_questions"] if q["type"] == "multi")
+    q["options"][0]["redline"] = True
+    assert any("redline" in e for e in validate_template(t))
+
 def test_next_version_bumps_and_copies():
     t = default_template()
     t2 = next_version(t)

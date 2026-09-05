@@ -145,6 +145,9 @@ def validate_template(t: dict) -> list:
     ids = [d.get("id") for d in dims]
     if len(ids) != len(set(ids)):
         errors.append("duplicate dimension id")
+    for i in ids:
+        if i not in DIM_IDS:
+            errors.append(f"unknown dimension id: {i}")
     wsum = round(sum(d.get("weight", 0.0) for d in dims), 6)
     if abs(wsum - 1.0) > 1e-6:
         errors.append(f"weights must sum to 1.0, got {wsum}")
@@ -161,6 +164,11 @@ def validate_template(t: dict) -> list:
                 for o in opts:
                     if not isinstance(o.get("score"), (int, float)):
                         errors.append(f"option missing score: {q.get('id')}")
+            else:
+                for o in q.get("options") or []:
+                    if isinstance(o, dict) and "redline" in o:
+                        errors.append(f"redline only allowed on choice options: {q.get('id')}")
+                        break
     return errors
 
 
