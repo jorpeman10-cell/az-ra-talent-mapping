@@ -67,7 +67,7 @@ function render() {
   T.dimensions.forEach((d, di) => {
     const card = document.createElement("div"); card.className = "card";
     let html = `<div class="dim-head">
-      <input name="dim-name" value="${d.name}" data-di="${di}">
+      <input name="dim-name" value="${(d.name || "").replace(/"/g, "&quot;")}" data-di="${di}">
       <span><label>权重</label> <input class="w" type="number" step="0.05" min="0" max="1"
         value="${d.weight}" data-w="${di}"></span>
       <span class="hint">id: ${d.id}（不可改）</span></div>`;
@@ -80,7 +80,7 @@ function render() {
                  data-role="${role}" data-di="${di}" data-qi="${qi}">
           ${q.type === "choice" || q.type === "multi" ?
             `<div class="opts"><textarea data-role="${role}" data-di="${di}" data-qi="${qi}"
-              >${optsToText(q.options, q.type)}</textarea>
+              >${optsToText(q.options, q.type).replace(/</g, "&lt;")}</textarea>
              <div class="hint">每行一个选项：文案 | 分值 | 1(红线,仅choice)</div></div>` : ""}`;
       });
     }
