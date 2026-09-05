@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>猎头用工决策看板</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+         background: #f5f6f8; color: #1a1a2e; }
+  header { background: #1a1a2e; color: #fff; padding: 18px 32px; display: flex;
+           justify-content: space-between; align-items: baseline; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header .meta { font-size: 12px; opacity: .7; }
+  .wrap { max-width: 1180px; margin: 24px auto; padding: 0 20px; }
+  .market { display: flex; gap: 16px; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 10px; padding: 16px 20px;
+          box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .market .card { flex: 1; }
+  .market .num { font-size: 24px; font-weight: 700; margin-top: 4px; }
+  .market .lbl { font-size: 12px; color: #888; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: right; padding: 10px 12px; color: #888; font-weight: 500;
+       border-bottom: 2px solid #eee; cursor: pointer; white-space: nowrap; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+  td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; text-align: right; }
+  tr:hover td { background: #fafbff; cursor: pointer; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px;
+         font-weight: 600; }
+  .EMPLOY { background: #e3f5e9; color: #177245; }
+  .INCUBATE { background: #fff3d6; color: #8a6400; }
+  .PASS { background: #fde5e5; color: #b03030; }
+  #detail { display: none; margin-top: 20px; }
+  #detail .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  #detail h2 { font-size: 16px; margin-bottom: 12px; }
+  .kv { display: flex; justify-content: space-between; padding: 6px 0;
+        border-bottom: 1px dashed #eee; font-size: 13px; }
+  .kv b { font-weight: 600; }
+  #chart { width: 100%; height: 260px; }
+  #histChart { width: 100%; height: 180px; }
+  .back { color: #4a6cf7; cursor: pointer; font-size: 13px; margin-bottom: 10px;
+          display: inline-block; }
+  .scanBtns button { margin-right: 8px; padding: 4px 14px; border: 1px solid #ddd;
+        background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .scanBtns button.on { background: #1a1a2e; color: #fff; border-color: #1a1a2e; }
+  .limit { font-size: 13px; margin-top: 8px; color: #555; }
+  .limit b { color: #b03030; font-size: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>猎头用工决策看板</h1>
+  <span class="meta" id="gen"></span>
+</header>
+<div class="wrap">
+  <div class="market" id="market"></div>
+
+  <div class="card" id="boardCard">
+    <table id="board">
+      <thead><tr>
+        <th>#</th><th>姓名</th><th>μ(万/季)</th><th>CV</th><th>β</th>
+        <th>保守产能(万/年)</th><th>年薪(万)</th><th>Y1利润率</th><th>雇员NPV(3年)</th><th>决策</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="detail">
+    <span class="back" onclick="hideDetail()">← 返回看板</span>
+    <div class="grid">
+      <div class="card"><h2>画像与产能</h2><div id="profileBox"></div></div>
+      <div class="card"><h2>双模式财务测算</h2><div id="modelBox"></div></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h2>季度回款历史</h2><div id="histChart"></div></div>
+    <div class="card" style="margin-top:16px">
+      <h2>调薪扫描 <span style="font-size:12px;color:#999">(固定产能口径, 扫描年薪)</span></h2>
+      <div class="scanBtns" style="margin:10px 0">
+        <button data-s="A">A 公司斜率</button>
+        <button data-s="B" class="on">B 外部斜率-0.05</button>
+        <button data-s="C">C 外部+免波动惩罚</button>
+      </div>
+      <div id="chart"></div>
+      <div class="limit" id="limitBox"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let boardData = null, curId = null, curScenario = "B";
+const fmt = (v, d=1) => v === null || v === undefined ? "—" : Number(v).toFixed(d);
+const pct = v => v === null || v === undefined ? "—" : (v*100).toFixed(1) + "%";
+
+async function loadBoard() {
+  const res = await fetch("/api/board");
+  boardData = await res.json();
+  document.getElementById("gen").textContent =
+    "生成时间 " + (boardData.generated_at || "").slice(0, 16).replace("T", " ");
+  const m = boardData;
+  document.getElementById("market").innerHTML = `
+    <div class="card"><div class="lbl">市场阶段</div><div class="num">${m.market_phase}</div></div>
+    <div class="card"><div class="lbl">市场斜率 (${m.slope_source === "external" ? "外部行业口径" : "公司口径"})</div>
+      <div class="num">${pct(m.market_slope)}</div></div>
+    <div class="card"><div class="lbl">市场波动率</div><div class="num">${pct(m.market_cv)}</div></div>
+    <div class="card"><div class="lbl">EMPLOY / INCUBATE / PASS</div>
+      <div class="num">${m.advisors.filter(a=>a.decision==="EMPLOY").length} /
+        ${m.advisors.filter(a=>a.decision==="INCUBATE").length} /
+        ${m.advisors.filter(a=>a.decision==="PASS").length}</div></div>`;
+  const tbody = document.querySelector("#board tbody");
+  tbody.innerHTML = "";
+  boardData.advisors.forEach((a, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${i+1}</td><td>${a.name}</td><td>${fmt(a.mu ?? "")}</td>
+      <td>${fmt(a.cv ?? "", 2)}</td><td>${fmt(a.beta, 2)}</td>
+      <td>${fmt(a.conservative)}</td><td></td><td></td><td></td>
+      <td><span class="tag ${a.decision}">${a.decision}</span></td>`;
+    tr.onclick = () => showDetail(a.advisor_id);
+    tbody.appendChild(tr);
+  });
+  // 补充单人字段(年薪/利润率/NPV)
+  for (const a of boardData.advisors) {
+    const d = await (await fetch(`/api/advisor/${a.advisor_id}`)).json();
+    const row = tbody.rows[boardData.advisors.indexOf(a)];
+    row.cells[2].textContent = fmt(d.profile.mu);
+    row.cells[3].textContent = fmt(d.profile.cv, 2);
+    row.cells[6].textContent = fmt(d.salary_annual);
+    row.cells[7].textContent = pct(d.models.employ.margin_y1);
+    row.cells[8].textContent = fmt(d.models.employ.npv_3y);
+  }
+}
+
+async function showDetail(aid) {
+  curId = aid;
+  const d = await (await fetch(`/api/advisor/${aid}`)).json();
+  document.getElementById("boardCard").style.display = "none";
+  document.getElementById("detail").style.display = "block";
+  const kv = (k, v) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`;
+  document.getElementById("profileBox").innerHTML =
+    `<h2>${d.advisor_name} · 画像与产能</h2>` +
+    kv("μ 季度产能中枢", fmt(d.profile.mu) + " 万/季") +
+    kv("CV 波动率(生效)", fmt(d.capacity.cv_used ?? d.profile.cv, 3) +
+       ` (${d.capacity.cv_source === "interview" ? "面试口径" : "回款口径"})`) +
+    kv("β 市场敏感度", fmt(d.profile.beta, 2) + ` → 收缩后 ${fmt(d.capacity.beta_adj ?? 1, 2)}`) +
+    kv("α 独立获客力", fmt(d.profile.alpha) + " 万/季") +
+    kv("有效基数", fmt(d.capacity.effective_base) + " 万/年") +
+    kv("总折减率", pct(d.capacity.total_discount)) +
+    kv("保守产能", fmt(d.capacity.conservative) + " 万/年") +
+    (d.pipeline ? kv("在途签约(近12月)", fmt(d.pipeline.signed_12m_wan) + " 万 × 回款率 " +
+       pct(d.pipeline.collection_prob)) : "") +
+    kv("年薪 / 公摊", fmt(d.salary_annual) + " 万 / " + fmt(d.overhead_annual) + " 万") +
+    kv("置信度", d.confidence);
+  document.getElementById("modelBox").innerHTML =
+    `<h2>双模式测算 <span class="tag ${d.decision}">${d.decision}</span></h2>` +
+    kv("雇员 NPV(3年)", fmt(d.models.employ.npv_3y) + " 万") +
+    kv("雇员 IRR", d.models.employ.irr === null ? "无解(全负)" : pct(d.models.employ.irr)) +
+    kv("雇员 Y1利润率", pct(d.models.employ.margin_y1)) +
+    kv("孵化 NPV(3年)", fmt(d.models.incubate.npv_3y) + " 万") +
+    kv("孵化 IRR", d.models.incubate.irr === null ? "无解" : pct(d.models.incubate.irr));
+
+  const hist = d.quarterly_history || {};
+  echarts.init(document.getElementById("histChart")).setOption({
+    xAxis: { type: "category", data: Object.keys(hist) },
+    yAxis: { type: "value", name: "万" },
+    series: [{ type: "bar", data: Object.values(hist), itemStyle: { color: "#4a6cf7" } }],
+    grid: { left: 50, right: 20, top: 20, bottom: 30 }
+  });
+  runScan();
+}
+
+document.querySelectorAll(".scanBtns button").forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll(".scanBtns button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    curScenario = b.dataset.s;
+    runScan();
+  };
+});
+
+async function runScan() {
+  if (!curId) return;
+  const s = await (await fetch(`/api/advisor/${curId}/salary_scan?scenario=${curScenario}`)).json();
+  echarts.init(document.getElementById("chart")).setOption({
+    xAxis: { type: "category", data: s.points.map(p => p.monthly), name: "月薪(元)" },
+    yAxis: [{ type: "value", name: "NPV(万)" }],
+    series: [{ type: "line", data: s.points.map(p => p.npv_3y), smooth: true,
+               markLine: { data: [{ yAxis: 0 }, { xAxis: String(s.current_salary_annual*10000/12),
+                    label: { formatter: "现薪资" } }] },
+               areaStyle: { opacity: 0.08 }, itemStyle: { color: "#1a1a2e" } }],
+    grid: { left: 60, right: 30, top: 30, bottom: 40 }
+  });
+  document.getElementById("limitBox").innerHTML =
+    `保守产能 <b>${fmt(s.capacity_conservative)}</b> 万/年 ｜ 当前年薪 ${fmt(s.current_salary_annual)} 万 ｜
+     EMPLOY 极限 <b>${s.employ_limit_monthly ? s.employ_limit_monthly + " 元/月" : "超出现薪资区间"}</b> ｜
+     盈亏平衡 <b>${s.breakeven_monthly ? s.breakeven_monthly + " 元/月" : "—"}</b>`;
+}
+
+function hideDetail() {
+  document.getElementById("detail").style.display = "none";
+  document.getElementById("boardCard").style.display = "block";
+}
+
+loadBoard();
+</script>
+</body>
+</html>

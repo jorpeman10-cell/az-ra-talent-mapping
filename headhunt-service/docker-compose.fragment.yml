@@ -1,0 +1,35 @@
+# 并入 hiijob pro 服务器现有 docker-compose.yml 的服务片段
+services:
+  headhunt-svc:                 # API + 看板页
+    build: ./headhunt-service
+    container_name: headhunt-svc
+    restart: unless-stopped
+    ports:
+      - "18801:18801"        # 内网 IP 白名单兜底, 勿暴露公网
+    env_file:
+      - ./headhunt-service/config/.env
+    volumes:
+      - ./headhunt-service/data:/app/data          # raw_cache / 输出 / 日志
+      - ./headhunt-service/config:/app/config      # config.yaml 热改
+
+  headhunt-mcp:                 # MCP 工具服务(供网关/Agent 调用)
+    build: ./headhunt-service
+    container_name: headhunt-mcp
+    restart: unless-stopped
+    command: ["python", "-m", "mcp_ext.server"]
+    ports:
+      - "18802:18802"
+    env_file:
+      - ./headhunt-service/config/.env
+    volumes:
+      - ./headhunt-service/data:/app/data
+      - ./headhunt-service/config:/app/config
+    depends_on:
+      - headhunt-svc
+
+# 注意: headhunt-svc 在 hiijob pro 上访问谷露库(118.190.96.172)仍需 SSH 隧道,
+# .env 里保留 GLLUE_SSH_HOST=118.190.96.172 / GLLUE_SSH_PORT=9998 即可
+# (collect.py 内置 sshtunnel, 容器内自动建立)
+
+# 宿主机 cron 示例:
+# 30 6 * * * docker exec headhunt-svc python -m jobs.daily_sync >> /var/log/headhunt_cron.log 2>&1

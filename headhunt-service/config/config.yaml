@@ -1,0 +1,55 @@
+# 猎头用工决策引擎 业务配置
+# 修改后 POST /api/config 或重启服务生效
+
+finance:
+  discount_rate: 0.12        # 折现率
+  attrition_rate: 0.10       # 年流失率
+  terminal_multiple: 0.5     # 孵化模式终端价值倍数
+  irr_threshold: 0.20        # IRR 门槛 20%
+  target_pct: 15.0           # 首年利润率门槛 %
+  demand_pct: 0.0            # 外部需求增量 %
+  competition_pct: 0.0       # 竞争挤压 %
+  lift_pct: 10.0             # 孵化产能提升 %
+  op_cost_pct: 15.0          # 孵化运营成本占回款 %
+  equity_pct: 20.0           # 公司占孵化主体股权 %
+  support_cost: 5.0          # 孵化支持成本 万/年
+  tax_ratio: 0.936           # 税后系数(制度规定)
+
+# 提成阶梯(与2023薪酬激励政策一致, 万元->比例)
+commission_tiers: [[40, 0.30], [60, 0.32], [100, 0.35], [150, 0.38], [200, 0.40], [99999, 0.45]]
+
+market:
+  external_slope: null       # null=公司内部口径; 外部医药行业口径建议 -0.05
+
+# 难度趋势曲线(管理后台季度维护)
+difficulty_curve:
+  "2023": 1.0
+  "2024": 1.0
+  "2025": 1.05
+  "2026": 1.10
+  "2027": 1.15
+  "2028": 1.20
+  "2029": 1.25
+
+cost:
+  overhead_mode: per_head    # per_head=按人头均摊 / weight=按工资权重
+  default_salary_annual: 18.0    # 万, 无薪资数据时兜底
+  default_insurance_pct: 28.0    # %, 兜底社保率
+  default_overhead_annual: 13.0  # 万, 无成本表时兜底公摊
+
+# 已离职顾问（合并行 "A/B" 归属判断时不计入）
+hr:
+  departed_names: ["沈铭骋", "刘科利"]
+  # 薪资人工校准（财务表滞后/录入错误时用），单位：元/月总包
+  # 魏菲：市场部实际 7000底薪+2000职位工资=9000（Steven 2026-09-04 确认；表内市场行 9100+2000 有误）
+  salary_overrides: {"魏菲": 9000}
+
+data:
+  salary_csv: data/salary_detail.csv
+  cost_xlsx: data/cost_split.xlsx
+  raw_cache: data/raw_cache.json
+  activity_cache: data/activity_cache.json
+  output_dir: data/output
+
+collect:
+  since: "2021-01-01"        # 采集起始日期(保证>=8季度历史)

@@ -1,0 +1,4 @@
+headhunt-service/data/
+headhunt-service/**/__pycache__/
+headhunt-service/.pytest_cache/
+superpowers-tmp/

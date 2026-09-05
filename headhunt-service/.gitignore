@@ -1,0 +1,6 @@
+config/.env
+data/output/
+data/raw_cache.json
+data/activity_cache.json
+__pycache__/
+*.pyc

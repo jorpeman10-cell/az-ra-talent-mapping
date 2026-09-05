@@ -1,0 +1,12 @@
+# headhunt-service 接入覆盖: 网关容器经容器名访问 headhunt-svc (已并入 lobe-network)
+# 项目: lobehub-aliyun-deploy
+services:
+  federation-gateway:
+    environment:
+      HEADHUNT_API: http://headhunt-svc:18801
+  federation-mcp:
+    environment:
+      HEADHUNT_API: http://headhunt-svc:18801
+  hiijob-workflow-worker:
+    environment:
+      HEADHUNT_API: http://headhunt-svc:18801
