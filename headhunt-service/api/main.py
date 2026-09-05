@@ -179,6 +179,8 @@ from candidate.store import (new_candidate, get as get_candidate,
                              validate_token, save_json, load_json,
                              derive_status, CONFIG_DIR)
 from candidate.questionnaire import default_template, validate_template, score_questionnaire
+from candidate import engine as cand_engine
+from pipeline.loaders import load_salary_map
 
 TEMPLATE_PATH = os.path.join(CONFIG_DIR, "questionnaire_template.json")
 
@@ -304,3 +306,47 @@ def api_candidate_detail(cid: str):
 def store_dir(cid):
     from candidate.store import CANDIDATES_DIR
     return os.path.join(CANDIDATES_DIR, cid)
+
+
+def _internal_samples():
+    """salary CSV x grade map -> {grade: [monthly,...]} for salary_band()."""
+    csv_path = os.environ.get("HEADHUNT_SALARY_CSV")
+    if not csv_path:
+        cfg = yaml.safe_load(open(CONFIG_PATH, encoding="utf-8"))
+        csv_path = os.path.join(BASE, cfg["data"]["salary_csv"])
+    if not os.path.isfile(csv_path):
+        return {}
+    hr_cfg = (yaml.safe_load(open(CONFIG_PATH, encoding="utf-8")) or {}).get("hr", {})
+    salary_map, _skipped = load_salary_map(
+        csv_path,
+        departed_names=hr_cfg.get("departed_names", []),
+        salary_overrides=hr_cfg.get("salary_overrides"))
+    grade_map_path = os.path.join(CONFIG_DIR, "candidate_grade_map.json")
+    grade_map = {}
+    if os.path.isfile(grade_map_path):
+        grade_map = json.load(open(grade_map_path, encoding="utf-8")).get("mapping", {})
+    return cand_engine.load_internal_samples(salary_map, grade_map)
+
+
+def _anchors():
+    p = os.path.join(CONFIG_DIR, "market_anchors.json")
+    if os.path.isfile(p):
+        return json.load(open(p, encoding="utf-8")).get("anchors", {})
+    return {}
+
+
+@app.post("/api/candidate/{cid}/assess")
+def api_candidate_assess(cid: str):
+    _get_checked(cid)
+    self_a = load_json(cid, "self_assess.json")
+    hr_a = load_json(cid, "hr_assess.json")
+    if not self_a or not hr_a:
+        raise HTTPException(409, f"questionnaires incomplete: "
+                                 f"self={'yes' if self_a else 'no'}, hr={'yes' if hr_a else 'no'}")
+    out = cand_engine.assess({"self": self_a["scored"], "hr": hr_a["scored"],
+                              "internal_samples": _internal_samples(), "anchors": _anchors()})
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    save_json(cid, f"assessment_{ts}.json", out)
+    update_candidate(cid, assessed_at=datetime.now(timezone.utc).isoformat(),
+                     status="ASSESSED")
+    return out

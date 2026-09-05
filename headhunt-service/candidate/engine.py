@@ -168,6 +168,9 @@ def salary_band(grade: str, internal_samples: dict, anchors: dict) -> dict:
     if not samples:  # last resort: whole pool
         for v in internal_samples.values():
             samples.extend(v)
+    if not samples:  # no internal salary data at all (empty grade map)
+        return {"p25": None, "p50": None, "p75": None,
+                "source": "no_internal_data", "confidence": "LOW"}
     p25, p50, p75 = _pct(samples)
     conf = "MEDIUM" if len(internal_samples.get(grade, [])) >= 2 else "LOW"
     anchor = anchors.get(grade)
@@ -240,7 +243,15 @@ def assess(bundle: dict) -> dict:
                 "divergence": div, "warnings": warnings}
 
     band = salary_band(leveling["grade"], bundle.get("internal_samples", {}), bundle.get("anchors", {}))
-    monthly = float(band["p50"])
+    monthly = band["p50"]
+    if monthly is None:
+        warnings.append("no internal salary samples — fill config/candidate_grade_map.json "
+                        "before salary band is meaningful")
+        return {"status": "OK", "leveling": leveling, "band": band,
+                "breakeven_wan": None, "breakeven_monthly": None,
+                "npv_quick_at_target": None, "line_match": lm, "divergence": div,
+                "confidence": "LOW", "warnings": warnings}
+    monthly = float(monthly)
     return {
         "status": "OK",
         "leveling": leveling,

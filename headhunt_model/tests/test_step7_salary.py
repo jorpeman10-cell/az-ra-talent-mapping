@@ -45,6 +45,11 @@ def test_band_interpolates_from_neighbor_grades():
     assert band["p50"] == 21000              # mean of SC1 samples
     assert band["confidence"] == "LOW"
 
+def test_band_no_internal_data():
+    band = salary_band("C1", {}, {})
+    assert band["source"] == "no_internal_data"
+    assert band["p50"] is None and band["confidence"] == "LOW"
+
 def test_load_internal_samples():
     salary_map = {"张三": {"base_monthly": 15000}, "李四": {"base_monthly": 20000}}
     grade_map = {"张三": "C1", "李四": "SC1"}
