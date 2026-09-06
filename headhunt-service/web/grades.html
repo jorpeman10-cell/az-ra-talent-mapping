@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>职级映射与市场锚点 — 外部顾问评估</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+         background: #f5f6f8; color: #1a1a2e; }
+  header { background: #1a1a2e; color: #fff; padding: 18px 32px; display: flex;
+           justify-content: space-between; align-items: baseline; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header .meta { font-size: 12px; opacity: .7; }
+  .wrap { max-width: 860px; margin: 24px auto 60px; padding: 0 20px; }
+  .card { background: #fff; border-radius: 10px; padding: 16px 20px; margin-bottom: 16px;
+          box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .card h2 { font-size: 15px; margin-bottom: 4px; }
+  .hint { font-size: 12px; color: #999; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; padding: 8px 10px; color: #888; font-weight: 500;
+       border-bottom: 2px solid #eee; }
+  td { padding: 6px 10px; border-bottom: 1px solid #f0f0f0; }
+  input, select { border: 1px solid #e0e0e8; border-radius: 6px; padding: 7px 10px;
+                  font-size: 14px; width: 100%; }
+  td.num input { text-align: right; }
+  button { background: #1a1a2e; color: #fff; border: none; border-radius: 8px;
+           padding: 9px 26px; font-size: 14px; cursor: pointer; margin-top: 10px; }
+  button.small { padding: 4px 12px; font-size: 12px; background: #e8e8ef; color: #444; }
+  .msg { font-size: 13px; margin-left: 12px; }
+  .msg.ok { color: #177245; } .msg.bad { color: #b03030; }
+</style>
+</head>
+<body>
+<header><h1>职级映射与市场锚点</h1><div class="meta">外部顾问评估 · 定薪带宽基准维护</div></header>
+<div class="wrap">
+  <div class="card">
+    <h2>顾问职级映射</h2>
+    <div class="hint">姓名必须与薪资表（salary_detail.csv）完全一致；用于按职级聚合内部底薪分位数。</div>
+    <table id="gm-table"><thead><tr><th style="width:45%">顾问姓名</th><th>职级</th><th></th></tr></thead><tbody></tbody></table>
+    <button class="small" onclick="addRow()">+ 添加顾问</button>
+    <button onclick="saveGM()">保存职级映射</button><span class="msg" id="gm-msg"></span>
+  </div>
+  <div class="card">
+    <h2>市场底薪锚点（元/月）</h2>
+    <div class="hint">按职级填写市场 P25/P50/P75；薪资带宽 = 内部分位与锚点 6:4 混合。未填职级自动退回纯内部分位。</div>
+    <table id="an-table"><thead><tr><th>职级</th><th>P25</th><th>P50</th><th>P75</th><th></th></tr></thead><tbody></tbody></table>
+    <button class="small" onclick="addAnchor()">+ 添加职级锚点</button>
+    <button onclick="saveAN()">保存锚点</button><span class="msg" id="an-msg"></span>
+  </div>
+</div>
+<script>
+let GRADES = [], GM = {}, AN = {};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+function renderGM() {
+  const tb = $("#gm-table tbody"); tb.innerHTML = "";
+  for (const [name, grade] of Object.entries(GM)) rowGM(tb, name, grade);
+}
+function rowGM(tb, name, grade) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td><input value="${esc(name)}" data-k="name"></td>
+    <td><select data-k="grade">${GRADES.map(g =>
+      `<option ${g === grade ? "selected" : ""}>${g}</option>`).join("")}</select></td>
+    <td><button class="small" onclick="this.closest('tr').remove()">删除</button></td>`;
+  tb.appendChild(tr);
+}
+function addRow() { rowGM($("#gm-table tbody"), "", GRADES[4]); }
+
+function renderAN() {
+  const tb = $("#an-table tbody"); tb.innerHTML = "";
+  for (const [grade, band] of Object.entries(AN)) rowAN(tb, grade, band);
+}
+function rowAN(tb, grade, band) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td><select data-k="grade">${GRADES.map(g =>
+      `<option ${g === grade ? "selected" : ""}>${g}</option>`).join("")}</select></td>
+    <td class="num"><input type="number" data-k="p25" value="${band?.p25 ?? ""}"></td>
+    <td class="num"><input type="number" data-k="p50" value="${band?.p50 ?? ""}"></td>
+    <td class="num"><input type="number" data-k="p75" value="${band?.p75 ?? ""}"></td>
+    <td><button class="small" onclick="this.closest('tr').remove()">删除</button></td>`;
+  tb.appendChild(tr);
+}
+function addAnchor() { rowAN($("#an-table tbody"), GRADES[4], {}); }
+
+async function saveGM() {
+  const mapping = {};
+  for (const tr of $("#gm-table tbody").rows) {
+    const name = tr.querySelector('[data-k=name]').value.trim();
+    const grade = tr.querySelector('[data-k=grade]').value;
+    if (name) mapping[name] = grade;
+  }
+  const r = await fetch("/api/hr-config/grade-map", {method: "PUT",
+    headers: {"Content-Type": "application/json"}, body: JSON.stringify({mapping})});
+  const m = $("#gm-msg"); m.className = "msg " + (r.ok ? "ok" : "bad");
+  m.textContent = r.ok ? `已保存 ${Object.keys(mapping).length} 条` : "被拒: " + (await r.text());
+}
+async function saveAN() {
+  const anchors = {};
+  for (const tr of $("#an-table tbody").rows) {
+    const grade = tr.querySelector('[data-k=grade]').value;
+    const band = {};
+    for (const k of ["p25", "p50", "p75"]) {
+      const v = parseFloat(tr.querySelector(`[data-k=${k}]`).value);
+      if (!isFinite(v) || v <= 0) { const m = $("#an-msg"); m.className = "msg bad";
+        m.textContent = `${grade} ${k} 需为正数`; return; }
+      band[k] = v;
+    }
+    anchors[grade] = band;
+  }
+  const r = await fetch("/api/hr-config/anchors", {method: "PUT",
+    headers: {"Content-Type": "application/json"}, body: JSON.stringify({anchors})});
+  const m = $("#an-msg"); m.className = "msg " + (r.ok ? "ok" : "bad");
+  m.textContent = r.ok ? `已保存 ${Object.keys(anchors).length} 个职级` : "被拒: " + (await r.text());
+}
+
+fetch("/api/hr-config").then(r => r.json()).then(j => {
+  GRADES = j.grades; GM = j.grade_map; AN = j.anchors; renderGM(); renderAN();
+});
+</script>
+</body>
+</html>

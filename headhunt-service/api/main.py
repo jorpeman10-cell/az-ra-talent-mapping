@@ -379,3 +379,83 @@ def api_template_put(t: dict):
         json.dump(old, f, ensure_ascii=False, indent=1)
     save_template(t)
     return {"saved": True, "version": t["version"]}
+
+
+# ---------- HR config: grade map + market anchors (M3, P1.5) ----------
+
+from candidate.engine import GRADE_INDEX  # noqa: E402  (appended block, see note above)
+
+GRADE_MAP_PATH = os.path.join(CONFIG_DIR, "candidate_grade_map.json")
+ANCHORS_PATH = os.path.join(CONFIG_DIR, "market_anchors.json")
+_GRADE_MAP_COMMENT = ("HR-maintained advisor->grade mapping for external-candidate "
+                      "salary bands. name must match salary_detail.csv.")
+_ANCHORS_COMMENT = "HR-maintained per-grade market monthly-salary anchors {grade:{p25,p50,p75}}."
+
+
+def _read_config_json(path, comment):
+    """Read a {.., "_comment": ..} HR config JSON; None when the file is absent.
+
+    Files ship as committed empty defaults; when missing (fresh volume) the
+    PUT handlers recreate them via the `or {}` fallback, so no seeding here.
+    """
+    if not os.path.isfile(path):
+        return None
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+class GradeMapIn(BaseModel):
+    mapping: dict
+
+
+class AnchorsIn(BaseModel):
+    anchors: dict
+
+
+@app.get("/grades")
+def grades_page():
+    return FileResponse(os.path.join(BASE, "web", "grades.html"))
+
+
+@app.get("/api/hr-config")
+def api_hr_config_get():
+    gm = _read_config_json(GRADE_MAP_PATH, _GRADE_MAP_COMMENT)
+    an = _read_config_json(ANCHORS_PATH, _ANCHORS_COMMENT)
+    return {"grade_map": gm.get("mapping", {}) if gm else {},
+            "anchors": an.get("anchors", {}) if an else {},
+            "grades": [g for g in GRADE_INDEX]}
+
+
+@app.put("/api/hr-config/grade-map")
+def api_hr_config_grade_map(body: GradeMapIn):
+    for name, grade in body.mapping.items():
+        if not isinstance(name, str) or not name.strip():
+            raise HTTPException(422, f"bad name: {name!r}")
+        if grade not in GRADE_INDEX:
+            raise HTTPException(422, f"unknown grade {grade!r}; valid: {[g for g in GRADE_INDEX]}")
+    doc = _read_config_json(GRADE_MAP_PATH, _GRADE_MAP_COMMENT) or {}
+    doc["_comment"] = _GRADE_MAP_COMMENT
+    doc["mapping"] = body.mapping
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    with open(GRADE_MAP_PATH, "w", encoding="utf-8") as f:
+        json.dump(doc, f, ensure_ascii=False, indent=1)
+    return {"saved": True, "n": len(body.mapping)}
+
+
+@app.put("/api/hr-config/anchors")
+def api_hr_config_anchors(body: AnchorsIn):
+    for grade, band in body.anchors.items():
+        if grade not in GRADE_INDEX:
+            raise HTTPException(422, f"unknown grade {grade!r}")
+        if not isinstance(band, dict) or set(band) != {"p25", "p50", "p75"}:
+            raise HTTPException(422, f"band for {grade} must have exactly p25/p50/p75")
+        for k, v in band.items():
+            if not isinstance(v, (int, float)) or isinstance(v, bool) or v <= 0:
+                raise HTTPException(422, f"band {grade}.{k} must be a positive number")
+    doc = _read_config_json(ANCHORS_PATH, _ANCHORS_COMMENT) or {}
+    doc["_comment"] = _ANCHORS_COMMENT
+    doc["anchors"] = body.anchors
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    with open(ANCHORS_PATH, "w", encoding="utf-8") as f:
+        json.dump(doc, f, ensure_ascii=False, indent=1)
+    return {"saved": True, "n": len(body.anchors)}
