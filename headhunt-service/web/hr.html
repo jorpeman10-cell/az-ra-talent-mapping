@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>面评问卷</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+         background: #f5f6f8; color: #1a1a2e; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: #888; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 10px; padding: 16px 18px; margin-bottom: 14px;
+          box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .card h3 { font-size: 15px; margin-bottom: 10px; }
+  .q { margin: 12px 0 16px; }
+  .q .label { font-size: 14px; margin-bottom: 6px; }
+  .opt { display: flex; align-items: center; gap: 8px; padding: 7px 10px; font-size: 14px;
+         border: 1px solid #e8e8ef; border-radius: 8px; margin: 4px 0; cursor: pointer; }
+  .opt input { transform: scale(1.15); }
+  input[type=number], input[type=text], textarea { width: 100%; border: 1px solid #e0e0e8;
+         border-radius: 8px; padding: 9px 10px; font-size: 14px; font-family: inherit; }
+  textarea { min-height: 72px; }
+  .bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff;
+         border-top: 1px solid #eee; padding: 12px 16px; text-align: center; }
+  button.primary { background: #1a1a2e; color: #fff; border: none; border-radius: 8px;
+                   padding: 12px 48px; font-size: 15px; }
+  .state { text-align: center; padding: 60px 20px; font-size: 15px; color: #666; }
+  .err { color: #b03030; font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap"><div id="app" class="state">加载中…</div></div>
+<div class="bar" id="bar" style="display:none"><button class="primary" onclick="submit()">提交</button>
+<div class="err" id="err"></div></div>
+<script>
+let T = null, NAME = "", answers = {}, INTERVIEWER = "";
+
+async function boot() {
+  const token = location.pathname.split("/h/")[1];
+  try {
+    const r = await fetch(`/api/h/${token}/template`);
+    if (!r.ok) {
+      const why = {"expired": "链接已过期（7天有效），请联系管理员重新发送",
+                   "already_submitted": "面评已提交，无需重复填写"}[r.json().detail] || "链接无效";
+      document.getElementById("app").innerHTML = `<div class="state">${why}</div>`;
+      return;
+    }
+    const j = await r.json();
+    T = j.template; NAME = j.candidate_name;
+    render();
+  } catch (e) {
+    document.getElementById("app").innerHTML =
+      `<div class="state">服务暂时不可用，请稍后刷新重试</div>`;
+  }
+}
+function render() {
+  let html = `<h1>面评问卷</h1><div class="sub">候选人：${NAME} · 面试官填写</div>`;
+  html += `<div class="card"><h3>面试官</h3>
+    <div class="q"><div class="label">您的姓名（必填）</div>
+    <input type="text" oninput="INTERVIEWER=this.value" placeholder="请输入面试官姓名"></div></div>`;
+  T.dimensions.forEach((d, di) => {
+    html += `<div class="card"><h3>${d.name}</h3>`;
+    d.hr_questions.forEach((q, qi) => {
+      html += `<div class="q"><div class="label">${q.label}</div>`;
+      if (q.type === "choice")
+        q.options.forEach((o, oi) => html +=
+          `<label class="opt"><input type="radio" name="${q.id}" value="${o.label}"
+            onchange="answers['${q.id}']='${o.label.replace(/'/g, "\\'")}'">${o.label}</label>`);
+      else if (q.type === "multi")
+        q.options.forEach(o => html +=
+          `<label class="opt"><input type="checkbox" value="${o.label}"
+            onchange="multi('${q.id}','${o.label.replace(/'/g, "\\'")}')">${o.label}</label>`);
+      else if (q.type === "number")
+        html += `<input type="number" oninput="answers['${q.id}']=+this.value">`;
+      else
+        html += `<textarea oninput="answers['${q.id}']=this.value"></textarea>`;
+      html += `</div>`;
+    });
+    html += `</div>`;
+  });
+  document.getElementById("app").innerHTML = html;
+  document.getElementById("bar").style.display = "";
+}
+function multi(qid, label) {
+  const cur = answers[qid] || [];
+  const i = cur.indexOf(label);
+  if (i >= 0) cur.splice(i, 1); else cur.push(label);
+  answers[qid] = cur;
+}
+async function submit() {
+  const token = location.pathname.split("/h/")[1];
+  document.getElementById("err").textContent = "";
+  if (!INTERVIEWER.trim()) {
+    document.getElementById("err").textContent = "提交被拒：请填写面试官姓名";
+    return;
+  }
+  const r = await fetch(`/api/h/${token}/submit`, {method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({answers, interviewer: INTERVIEWER.trim()})});
+  if (r.ok) {
+    document.getElementById("app").innerHTML =
+      `<div class="state">✅ 面评已存档</div>`;
+    document.getElementById("bar").style.display = "none";
+  } else if (r.status === 422) {
+    document.getElementById("err").textContent = "提交被拒：请检查必填项";
+  } else {
+    document.getElementById("err").textContent = "提交失败（" + r.status + "），请稍后重试";
+  }
+}
+boot();
+</script>
+</body>
+</html>

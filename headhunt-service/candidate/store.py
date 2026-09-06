@@ -10,7 +10,8 @@ BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.environ.get("HEADHUNT_DATA_DIR") or os.path.join(BASE, "data")
 CONFIG_DIR = os.environ.get("HEADHUNT_CONFIG_DIR") or os.path.join(BASE, "config")
 CANDIDATES_DIR = os.path.join(DATA_DIR, "candidates")
-TOKEN_TTL_HOURS = 48
+TOKEN_TTL_HOURS = 48          # self-assess token (single use)
+HR_TOKEN_TTL_HOURS = 168      # HR interview-assess token, 7 days (independent)
 
 
 def _now():
@@ -34,6 +35,8 @@ def new_candidate(name, target_line="", notes=""):
         "created_at": _now().isoformat(),
         "token": secrets.token_urlsafe(24),
         "token_expires_at": (_now() + timedelta(hours=TOKEN_TTL_HOURS)).isoformat(),
+        "hr_token": secrets.token_urlsafe(24),
+        "hr_token_expires_at": (_now() + timedelta(hours=HR_TOKEN_TTL_HOURS)).isoformat(),
         "self_submitted_at": None, "hr_submitted_at": None, "assessed_at": None,
         "status": "CREATED",
     }
@@ -95,6 +98,24 @@ def validate_token(token, now=None):
             if rec.get("self_submitted_at"):
                 return None, "already_submitted"
             if now > datetime.fromisoformat(rec["token_expires_at"]):
+                return None, "expired"
+            return cid, None
+    return None, "not_found"
+
+
+def validate_hr_token(token, now=None):
+    """HR interview-assess token: same contract as validate_token but keyed on
+    hr_token / hr_token_expires_at / hr_submitted_at. Fully independent from
+    the self-assess token."""
+    now = now or _now()
+    if not os.path.isdir(CANDIDATES_DIR):
+        return None, "not_found"
+    for cid in os.listdir(CANDIDATES_DIR):
+        rec = get(cid)
+        if rec and rec.get("hr_token") == token:
+            if rec.get("hr_submitted_at"):
+                return None, "already_submitted"
+            if now > datetime.fromisoformat(rec["hr_token_expires_at"]):
                 return None, "expired"
             return cid, None
     return None, "not_found"

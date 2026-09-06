@@ -176,8 +176,8 @@ from datetime import timezone
 
 from candidate.store import (new_candidate, get as get_candidate,
                              update as update_candidate, list_candidates,
-                             validate_token, save_json, load_json,
-                             derive_status, CONFIG_DIR)
+                             validate_token, validate_hr_token, save_json,
+                             load_json, derive_status, CONFIG_DIR)
 from candidate.store import DATA_DIR as CAND_DATA_DIR
 from candidate.questionnaire import default_template, validate_template, score_questionnaire
 from candidate import engine as cand_engine
@@ -243,7 +243,8 @@ def api_candidate_intake(body: IntakeIn):
         raise HTTPException(422, "name required")
     rec = new_candidate(body.name.strip(), body.target_line, body.notes)
     return {"cid": rec["cid"], "name": rec["name"], "status": rec["status"],
-            "self_url": f"/q/{rec['token']}", "expires_at": rec["token_expires_at"]}
+            "self_url": f"/q/{rec['token']}", "expires_at": rec["token_expires_at"],
+            "hr_url": f"/h/{rec['hr_token']}"}
 
 
 @app.get("/q/{token}")
@@ -274,6 +275,38 @@ def api_q_submit(token: str, body: SubmitIn):
     update_candidate(cid, self_submitted_at=datetime.now(timezone.utc).isoformat(),
                      status="SELF_DONE")
     return {"ok": True, "status": "SELF_DONE"}
+
+
+@app.get("/h/{token}")
+def h_page(token: str):
+    # Same always-serve pattern as q_page: the JS calls /api/h/{token}/template
+    # which reports 410/404 with a reason, rendered as a friendly state.
+    return FileResponse(os.path.join(BASE, "web", "hr.html"))
+
+
+@app.get("/api/h/{token}/template")
+def api_h_template(token: str):
+    cid, reason = validate_hr_token(token)
+    if not cid:
+        raise _token_http_error(reason)
+    rec = get_candidate(cid)
+    return {"candidate_name": rec["name"], "expires_at": rec["hr_token_expires_at"],
+            "template": load_template()}
+
+
+@app.post("/api/h/{token}/submit")
+def api_h_submit(token: str, body: HrAssessIn):
+    # Token-gated equivalent of /api/candidate/{cid}/hr-assess (same archive shape).
+    cid, reason = validate_hr_token(token)
+    if not cid:
+        raise _token_http_error(reason)
+    result = score_questionnaire(load_template(), body.answers, "hr")
+    save_json(cid, "hr_assess.json",
+              {"scored": result, "answers": body.answers, "interviewer": body.interviewer,
+               "submitted_at": datetime.now(timezone.utc).isoformat()})
+    update_candidate(cid, hr_submitted_at=datetime.now(timezone.utc).isoformat(),
+                     status="HR_DONE")
+    return {"ok": True, "status": derive_status(get_candidate(cid))}
 
 
 @app.post("/api/candidate/{cid}/hr-assess")
