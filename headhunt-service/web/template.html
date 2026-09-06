@@ -76,7 +76,7 @@ function render() {
       d[role].forEach((q, qi) => {
         html += `<div class="q">
           <div style="font-size:11px;color:#999">${q.id} · ${q.type}</div>
-          <input class="label" value="${(q.label || "").replace(/"/g, "&quot;")}"
+          <input class="label" maxlength="300" value="${(q.label || "").replace(/"/g, "&quot;")}"
                  data-role="${role}" data-di="${di}" data-qi="${qi}">
           ${q.type === "choice" || q.type === "multi" ?
             `<div class="opts"><textarea data-role="${role}" data-di="${di}" data-qi="${qi}"

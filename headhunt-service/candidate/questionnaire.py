@@ -154,6 +154,11 @@ def validate_template(t: dict) -> list:
         errors.append(f"weights must sum to 1.0, got {wsum}")
     for d in dims:
         for q in d.get("self_questions", []) + d.get("hr_questions", []):
+            label = q.get("label")
+            if isinstance(label, str) and len(label) > 300:
+                errors.append(
+                    f"question label exceeds 300 characters: {q.get('id')}"
+                )
             if q.get("type") not in QUESTION_TYPES:
                 errors.append(f"bad question type: {q.get('type')}")
             if "redline" in q:

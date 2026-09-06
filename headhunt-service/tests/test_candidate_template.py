@@ -6,6 +6,7 @@ import os, sys, json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi.testclient import TestClient
 from api.main import app
+from candidate.questionnaire import validate_template
 
 # conftest.py sets HEADHUNT_DATA_DIR before api.main imports; pytest does not
 # inject conftest globals into test modules, so re-read it here.
@@ -28,6 +29,20 @@ def test_put_invalid_rejected():
     assert any("weight" in e for e in r.json()["detail"])
 
 
+def test_question_label_length_is_limited_to_300_characters():
+    t = client.get("/api/template").json()
+    question = t["dimensions"][0]["self_questions"][0]
+
+    question["label"] = "题" * 300
+    assert not any("question label" in error for error in validate_template(t))
+
+    question["label"] = "题" * 301
+    errors = validate_template(t)
+    assert any("question label exceeds 300 characters" in error for error in errors)
+    response = client.put("/api/template", json=t)
+    assert response.status_code == 422
+
+
 def test_put_valid_bumps_version_and_archives():
     t = client.get("/api/template").json()
     t["dimensions"][0]["name"] = "业绩证据（修订）"
@@ -41,7 +56,9 @@ def test_put_valid_bumps_version_and_archives():
 
 
 def test_editor_page_served():
-    assert client.get("/template").status_code == 200
+    response = client.get("/template")
+    assert response.status_code == 200
+    assert 'maxlength="300"' in response.text
 
 
 if __name__ == "__main__":
