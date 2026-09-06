@@ -115,7 +115,10 @@ def verify(client):
                 "-H 'Accept: application/json, text/event-stream' "
                 "-d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{}}' "
                 "-o /tmp/mcp_smoke.txt && head -c 500 /tmp/mcp_smoke.txt || { echo 'MCP SMOKE FAILED'; exit 1; }")
-    run(client, "docker ps --format '{{.Names}} {{.RestartCount}}' | grep -v headhunt | awk '$2>0{c++} END{print \"non-headhunt containers with restarts:\", c+0}'")
+    # RestartCount is not a `docker ps --format` field on this docker version; use inspect
+    run(client, "docker ps --format '{{.Names}}' | grep -v headhunt | "
+                "xargs -r docker inspect --format '{{.Name}} {{.RestartCount}}' | "
+                "awk '$2>0{c++} END{print \"non-headhunt containers with restarts:\", c+0}'")
 
 
 if __name__ == "__main__":
