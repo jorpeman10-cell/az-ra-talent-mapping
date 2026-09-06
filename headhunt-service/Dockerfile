@@ -2,7 +2,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Aliyun mirror: ECS pulls from pypi.org time out (2026-09-06 deploy incident)
+RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ \
+    --trusted-host mirrors.aliyun.com -r requirements.txt
 
 COPY pipeline/ pipeline/
 COPY candidate/ candidate/

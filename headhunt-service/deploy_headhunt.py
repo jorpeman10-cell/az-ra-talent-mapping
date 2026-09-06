@@ -79,7 +79,10 @@ def upload(client):
 
 
 def up(client):
-    run(client, f"cd {REMOTE_DIR} && docker build -t headhunt-svc:local . 2>&1 | tail -5", timeout=1800)
+    # bash pipefail: a failed docker build must fail the step, not hide behind tail's exit 0
+    # (2026-09-06 incident: pip layer rebuild timed out, old image silently reused -> 404s)
+    run(client, f"cd {REMOTE_DIR} && bash -c 'set -o pipefail; docker build -t headhunt-svc:local . 2>&1 | tail -5'",
+        timeout=1800)
     # 独立起两个容器(不并入主 compose, 零侵入)
     run(client, "docker rm -f headhunt-svc headhunt-mcp 2>/dev/null || true")
     # 2026-09-05: 必须并入 lobe-network——federation 网关经 HEADHUNT_API=http://headhunt-svc:18801
