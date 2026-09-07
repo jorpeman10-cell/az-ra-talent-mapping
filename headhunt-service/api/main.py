@@ -384,13 +384,33 @@ def api_candidate_detail(cid: str):
                 latest = load_json(cid, fname)
                 break
     facts = candidate_workflow_facts(cid)
+    self_assess = load_json(cid, "self_assess.json")
+    hr_assess = load_json(cid, "hr_assess.json")
+    template = load_template()
+    archived_versions = [
+        response.get("scored", {}).get("template_version")
+        for response in (self_assess, hr_assess)
+        if isinstance(response, dict)
+        and isinstance(response.get("scored"), dict)
+        and response.get("scored", {}).get("template_version") is not None
+    ]
+    pinned_template_version = (
+        archived_versions[0]
+        if archived_versions and len(set(archived_versions)) == 1
+        else template.get("version")
+    )
+    questionnaire = {
+        **facts["questionnaire"],
+        "template_id": template.get("template_id"),
+        "template_version": pinned_template_version,
+    }
     return {"profile": public_profile,
-            "self_assess": load_json(cid, "self_assess.json"),
-            "hr_assess": load_json(cid, "hr_assess.json"),
+            "self_assess": self_assess,
+            "hr_assess": hr_assess,
             "latest_assessment": latest,
             "completion": facts["completion"],
             "source_versions": facts["source_versions"],
-            "questionnaire": facts["questionnaire"],
+            "questionnaire": questionnaire,
             "latest_assessment_version_id": latest_version_id}
 
 

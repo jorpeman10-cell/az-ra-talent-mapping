@@ -114,8 +114,21 @@ def test_candidate_detail_exposes_facts_without_raw_questionnaire_tokens() -> No
     payload = detail.json()
     assert payload["completion"] == {"self": False, "hr": False}
     assert payload["source_versions"] == {"self": None, "hr": None}
+    assert payload["questionnaire"]["template_id"] == "consultant_v1"
+    assert payload["questionnaire"]["template_version"] >= 1
     assert "token" not in payload["profile"]
     assert "hr_token" not in payload["profile"]
+
+
+def test_candidate_detail_pins_the_archived_response_template_version() -> None:
+    rec = client.post("/api/candidate/intake", json={"name": "版本绑定"}).json()
+    _archive_response(rec["cid"], "self", "self")
+    _archive_response(rec["cid"], "hr", "hr")
+
+    payload = client.get(f"/api/candidate/{rec['cid']}").json()
+
+    assert payload["questionnaire"]["template_id"] == "consultant_v1"
+    assert payload["questionnaire"]["template_version"] == 3
 
 
 def test_internal_rotation_route_requires_secret_and_returns_only_new_link(
