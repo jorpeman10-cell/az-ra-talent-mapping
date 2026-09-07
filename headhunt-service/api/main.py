@@ -4,6 +4,7 @@ import os
 import json
 import glob
 import hmac
+import hashlib
 from datetime import datetime
 from typing import Literal
 
@@ -11,7 +12,7 @@ import yaml
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from pipeline.run import run_pipeline, load_config
 from pipeline.finance import HeadhuntDecisionModel
@@ -184,6 +185,11 @@ from candidate.store import (new_candidate, get as get_candidate,
 from candidate.store import DATA_DIR as CAND_DATA_DIR
 from candidate.questionnaire import default_template, validate_template, score_questionnaire
 from candidate import engine as cand_engine
+from candidate.report_store import (
+    ReportStoreError,
+    archive_report,
+    get_report_version,
+)
 from pipeline.loaders import load_salary_map
 
 TEMPLATE_PATH = os.path.join(CONFIG_DIR, "questionnaire_template.json")
@@ -238,6 +244,25 @@ class HrAssessIn(BaseModel):
 
 class RotateQuestionnaireIn(BaseModel):
     role: Literal["self", "hr"]
+
+
+class CandidateReportArchiveIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["candidate_assessment_report_v1"]
+    report_id: str = Field(min_length=8, max_length=68)
+    report_version: int = Field(ge=1)
+    cid: str
+    workflow_id: str = Field(min_length=1, max_length=128)
+    workflow_run_id: str = Field(min_length=1, max_length=128)
+    input_snapshot_hash: str
+    assessment_version_id: str = Field(min_length=1, max_length=128)
+    renderer_version: str = Field(min_length=1, max_length=128)
+    generator: dict
+    created_by: str = Field(min_length=1, max_length=128)
+    confirmed_by: str = Field(min_length=1, max_length=128)
+    created_at: str
+    report: dict
 
 
 def _verify_internal_token(x_headhunt_internal_token: str = Header(default="")):
@@ -350,10 +375,14 @@ def api_candidate_detail(cid: str):
         if key not in ("token", "hr_token")
     }
     latest = None
-    for fname in sorted(os.listdir(store_dir(cid)), reverse=True):
-        if fname.startswith("assessment_") and fname.endswith(".json"):
-            latest = load_json(cid, fname)
-            break
+    latest_version_id = rec.get("latest_assessment_version_id")
+    if latest_version_id:
+        latest = load_json(cid, f"assessment_{latest_version_id}.json")
+    if latest is None:
+        for fname in sorted(os.listdir(store_dir(cid)), reverse=True):
+            if fname.startswith("assessment_") and fname.endswith(".json"):
+                latest = load_json(cid, fname)
+                break
     facts = candidate_workflow_facts(cid)
     return {"profile": public_profile,
             "self_assess": load_json(cid, "self_assess.json"),
@@ -362,7 +391,7 @@ def api_candidate_detail(cid: str):
             "completion": facts["completion"],
             "source_versions": facts["source_versions"],
             "questionnaire": facts["questionnaire"],
-            "latest_assessment_version_id": None}
+            "latest_assessment_version_id": latest_version_id}
 
 
 @app.post("/api/internal/candidate/{cid}/questionnaire-token/rotate")
@@ -386,6 +415,37 @@ def api_rotate_questionnaire_token(
         "url": prefix + rotated["token"],
         "expires_at": rotated["expires_at"],
     }
+
+
+@app.post("/api/internal/candidate/{cid}/reports")
+def api_archive_candidate_report(
+    cid: str,
+    body: CandidateReportArchiveIn,
+    x_headhunt_internal_token: str = Header(default=""),
+):
+    _verify_internal_token(x_headhunt_internal_token)
+    _get_checked(cid)
+    try:
+        return archive_report(cid, body.model_dump(), expected_version=body.report_version)
+    except ReportStoreError as exc:
+        status = 404 if str(exc) in ("candidate_not_found", "report_not_found") else 409
+        raise HTTPException(status, str(exc)) from exc
+
+
+@app.get("/api/internal/candidate/{cid}/reports/{report_id}/versions/{version}")
+def api_get_candidate_report(
+    cid: str,
+    report_id: str,
+    version: int,
+    x_headhunt_internal_token: str = Header(default=""),
+):
+    _verify_internal_token(x_headhunt_internal_token)
+    _get_checked(cid)
+    try:
+        return get_report_version(cid, report_id, version)
+    except ReportStoreError as exc:
+        status = 404 if str(exc) in ("candidate_not_found", "report_not_found") else 422
+        raise HTTPException(status, str(exc)) from exc
 
 
 def store_dir(cid):
@@ -428,12 +488,43 @@ def api_candidate_assess(cid: str):
     if not self_a or not hr_a:
         raise HTTPException(409, f"questionnaires incomplete: "
                                  f"self={'yes' if self_a else 'no'}, hr={'yes' if hr_a else 'no'}")
+    self_template_version = self_a.get("scored", {}).get("template_version")
+    hr_template_version = hr_a.get("scored", {}).get("template_version")
+    if self_template_version != hr_template_version:
+        raise HTTPException(409, "questionnaire_template_version_mismatch")
+    facts = candidate_workflow_facts(cid)
+    identity = {
+        "cid": cid,
+        "template_version": self_template_version,
+        "source_versions": facts["source_versions"],
+    }
+    encoded = json.dumps(
+        identity, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    ).encode("utf-8")
+    version_id = "cav_" + hashlib.sha256(encoded).hexdigest()[:24]
+    fname = f"assessment_{version_id}.json"
+    existing = load_json(cid, fname)
+    if existing is not None:
+        profile = get_candidate(cid) or {}
+        if (
+            profile.get("latest_assessment_version_id") != version_id
+            or not profile.get("assessed_at")
+        ):
+            update_candidate(
+                cid,
+                assessed_at=datetime.now(timezone.utc).isoformat(),
+                latest_assessment_version_id=version_id,
+                status="ASSESSED",
+            )
+        return existing
     out = cand_engine.assess({"self": self_a["scored"], "hr": hr_a["scored"],
                               "internal_samples": _internal_samples(), "anchors": _anchors()})
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    save_json(cid, f"assessment_{ts}.json", out)
+    out["assessment_version_id"] = version_id
+    out["source_versions"] = facts["source_versions"]
+    out["template_version"] = self_template_version
+    save_json(cid, fname, out)
     update_candidate(cid, assessed_at=datetime.now(timezone.utc).isoformat(),
-                     status="ASSESSED")
+                     latest_assessment_version_id=version_id, status="ASSESSED")
     return out
 
 
