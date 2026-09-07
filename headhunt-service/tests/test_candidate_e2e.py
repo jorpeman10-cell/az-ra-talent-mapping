@@ -8,11 +8,19 @@ import json
 import os
 from pathlib import Path
 import sys
+from datetime import datetime, timezone
+from tempfile import TemporaryDirectory
+
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from candidate import report_store as candidate_report_store
+from candidate import store as candidate_store
+from candidate.questionnaire import DIM_IDS, default_template
 
 
 CONTRACT_SCHEMA_VERSION = "candidate_assessment_headhunt_contract_v1"
 # Updated only after the independently tracked Federation artifact is canonicalized.
-CONTRACT_SHA256 = "83bcf19ac27dbc3cd649ebb05fa5be6449e5f73575295186fd9a189ae7f13845"
+CONTRACT_SHA256 = "d548e6e232c60a5c5d49dec8f362ab8df89394850d4e4f058622254062abf39c"
 
 
 def _canonical_json(value: object) -> bytes:
@@ -37,17 +45,61 @@ def _content_version(value: object) -> str:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
-def candidate_assessment_contract_fixture() -> dict:
-    """Return one deterministic, synthetic producer/consumer contract.
+def _private_report(snapshot_hash: str) -> dict:
+    dimensions = (
+        "performance",
+        "domain_depth",
+        "response_speed",
+        "stability",
+        "collaboration_compliance",
+    )
+    evidence = {
+        "performance": ["self:perf_amount", "hr:perf_verify"],
+        "domain_depth": ["self:dom_tags", "hr:dom_depth"],
+        "response_speed": ["self:speed_case", "hr:speed_probe"],
+        "stability": ["assessment:leveling.grade"],
+        "collaboration_compliance": ["assessment:status"],
+    }
+    return {
+        "schema_version": "candidate_assessment_report_v1",
+        "executive_summary": "Synthetic evidence supports a governed review.",
+        "recommendation": {
+            "decision": "PROCEED_WITH_VALIDATION",
+            "rationale": ["Synthetic evidence requires human validation."],
+        },
+        "level_and_pay": {
+            "recommended_grade": "C1",
+            "salary_band": {"p25": 18000, "p50": 20000, "p75": 23000},
+            "confidence": "MEDIUM",
+            "interpretation": "The deterministic band is retained unchanged.",
+        },
+        "dimensions": [
+            {
+                "dimension": dimension,
+                "finding": f"Synthetic {dimension} evidence is available.",
+                "confidence": "MEDIUM",
+                "evidence_refs": evidence[dimension],
+            }
+            for dimension in dimensions
+        ],
+        "agreement_and_conflicts": [],
+        "risks_and_evidence_gaps": [],
+        "follow_up_questions": ["Validate the synthetic evidence with a human."],
+        "onboarding_validation": [],
+        "limitations": [
+            "Decision support only; not an automatic employment decision."
+        ],
+        "source_snapshot_hash": snapshot_hash,
+    }
 
-    The report and rotation responses are deliberately security projections:
-    immutable identity/version facts are retained while the full report body
-    and raw questionnaire URL token are represented only by hashes/prefixes.
-    """
+
+def candidate_assessment_contract_fixture() -> dict:
+    """Generate a sanitized contract through the real stdlib stores."""
 
     cid = "c20260907090000abcd"
     workflow_id = "wf_candidate_contract_001"
-    template_version = 3
+    template = default_template()
+    template_version = template["version"]
     self_assess = {
         "answers": {
             "dom_tags": ["oncology"],
@@ -57,11 +109,8 @@ def candidate_assessment_contract_fixture() -> dict:
         "scored": {
             "claimed_billing_wan": 90.0,
             "dimensions": {
-                "collaboration_compliance": {"answers": {}, "score": 4.0},
-                "domain_depth": {"answers": {}, "score": 4.0},
-                "performance": {"answers": {}, "score": 5.0},
-                "response_speed": {"answers": {}, "score": 5.0},
-                "stability": {"answers": {}, "score": 4.0},
+                dimension: {"answers": {}, "score": 4.0}
+                for dimension in DIM_IDS
             },
             "domain_tags": ["oncology"],
             "redline": False,
@@ -80,11 +129,8 @@ def candidate_assessment_contract_fixture() -> dict:
         "scored": {
             "claimed_billing_wan": None,
             "dimensions": {
-                "collaboration_compliance": {"answers": {}, "score": 4.0},
-                "domain_depth": {"answers": {}, "score": 4.0},
-                "performance": {"answers": {}, "score": 4.0},
-                "response_speed": {"answers": {}, "score": 5.0},
-                "stability": {"answers": {}, "score": 4.0},
+                dimension: {"answers": {}, "score": 4.0}
+                for dimension in DIM_IDS
             },
             "domain_tags": [],
             "redline": False,
@@ -93,138 +139,174 @@ def candidate_assessment_contract_fixture() -> dict:
         },
         "submitted_at": "2026-09-07T09:20:00+00:00",
     }
-    source_versions = {
-        "self": _content_version(self_assess),
-        "hr": _content_version(hr_assess),
-    }
-    assessment_identity = {
-        "cid": cid,
-        "source_versions": source_versions,
-        "template_version": template_version,
-    }
-    assessment_version_id = (
-        "cav_"
-        + hashlib.sha256(
-            json.dumps(
-                assessment_identity,
-                ensure_ascii=False,
-                separators=(",", ":"),
-                sort_keys=True,
-            ).encode("utf-8")
-        ).hexdigest()[:24]
-    )
-    assessment = {
-        "assessment_version_id": assessment_version_id,
-        "band": {"p25": 18000, "p50": 20000, "p75": 23000},
-        "confidence": "MEDIUM",
-        "divergence": {"divergent": [], "high_divergence": False},
-        "leveling": {"effective_billing_wan": 72.0, "grade": "C1"},
-        "source_versions": source_versions,
-        "status": "OK",
-        "template_version": template_version,
-    }
-    detail = {
-        "completion": {"hr": True, "self": True},
-        "hr_assess": hr_assess,
-        "latest_assessment": assessment,
-        "latest_assessment_version_id": assessment_version_id,
-        "profile": {
-            "assessed_at": "2026-09-07T09:30:00+00:00",
-            "cid": cid,
-            "created_at": "2026-09-07T09:00:00+00:00",
-            "hr_submitted_at": "2026-09-07T09:20:00+00:00",
-            "hr_token_expires_at": "2026-09-14T09:00:00+00:00",
-            "latest_assessment_version_id": assessment_version_id,
-            "name": "Synthetic Candidate",
-            "notes": "Synthetic contract data only",
-            "self_submitted_at": "2026-09-07T09:10:00+00:00",
-            "status": "ASSESSED",
-            "target_line": "oncology",
-            "token_expires_at": "2026-09-09T09:00:00+00:00",
-        },
-        "questionnaire": {
-            "hr": {
-                "expires_at": "2026-09-14T09:00:00+00:00",
-                "submitted_at": "2026-09-07T09:20:00+00:00",
-            },
-            "self": {
-                "expires_at": "2026-09-09T09:00:00+00:00",
-                "submitted_at": "2026-09-07T09:10:00+00:00",
-            },
-            "template_id": "consultant_v1",
-            "template_version": template_version,
-        },
-        "self_assess": self_assess,
-        "source_versions": source_versions,
-    }
-    snapshot_without_hash = {
-        "candidate": {
-            "name": detail["profile"]["name"],
-            "notes": detail["profile"]["notes"],
-            "target_line": detail["profile"]["target_line"],
-        },
-        "cid": cid,
-        "deterministic_assessment": {
-            "assessment_version_id": assessment_version_id,
-            "result": assessment,
-        },
-        "hr_response": {
-            "answers": hr_assess["answers"],
-            "interviewer": hr_assess["interviewer"],
-            "scores": hr_assess["scored"],
-            "submission_version": source_versions["hr"],
-        },
-        "questionnaire": {
-            "template_id": "consultant_v1",
-            "template_version": template_version,
-        },
-        "schema_version": "candidate_assessment_input_v1",
-        "self_response": {
-            "answers": self_assess["answers"],
-            "scores": self_assess["scored"],
-            "submission_version": source_versions["self"],
-        },
-        "workflow_id": workflow_id,
-    }
-    input_snapshot_hash = _content_version(snapshot_without_hash)
-    report_id = (
-        "car_"
-        + hashlib.sha256(f"{workflow_id}:{input_snapshot_hash}".encode("utf-8"))
-        .hexdigest()[:24]
-    )
-    report_artifact = {
-        "assessment_version_id": assessment_version_id,
-        "cid": cid,
-        "confirmed_by": "synthetic-user",
-        "created_at": "2026-09-07T10:00:00+00:00",
-        "created_by": "federation",
-        "generator": {
-            "prompt_version": "candidate-assessment-report-v1",
-            "workflow_key": "candidate_assessment_report",
-            "workflow_version": "2026-09-07.1",
-        },
-        "input_snapshot_hash": input_snapshot_hash,
-        "renderer_version": "candidate-assessment-html-v1",
-        "report": {
-            "schema_version": "candidate_assessment_report_v1",
-            "source_snapshot_hash": input_snapshot_hash,
-        },
-        "report_id": report_id,
-        "report_version": 1,
-        "schema_version": "candidate_assessment_report_v1",
-        "workflow_id": workflow_id,
-        "workflow_run_id": f"{workflow_id}:attempt:1",
-    }
-    report_metadata = {
-        "artifact_hash": _content_version(report_artifact),
-        "assessment_version_id": assessment_version_id,
-        "cid": cid,
-        "input_snapshot_hash": input_snapshot_hash,
-        "report_id": report_id,
-        "report_schema_version": "candidate_assessment_report_v1",
-        "report_version": 1,
-        "workflow_id": workflow_id,
-    }
+
+    original_store_root = candidate_store.CANDIDATES_DIR
+    original_report_root = candidate_report_store.CANDIDATES_DIR
+    with TemporaryDirectory(prefix="candidate-contract-") as temporary:
+        candidates_root = os.path.join(temporary, "candidates")
+        candidate_store.CANDIDATES_DIR = candidates_root
+        candidate_report_store.CANDIDATES_DIR = candidates_root
+        try:
+            candidate_store.save_json(
+                cid,
+                "profile.json",
+                {
+                    "cid": cid,
+                    "name": "Synthetic Candidate",
+                    "target_line": "oncology",
+                    "notes": "Synthetic contract data only",
+                    "created_at": "2026-09-07T09:00:00+00:00",
+                    "token": "private-expired-token",
+                    "token_expires_at": "2026-09-07T08:00:00+00:00",
+                    "hr_token": "private-hr-token",
+                    "hr_token_expires_at": "2026-09-14T09:00:00+00:00",
+                    "self_submitted_at": None,
+                    "hr_submitted_at": None,
+                    "assessed_at": None,
+                    "status": "CREATED",
+                },
+            )
+            rotation = candidate_store.rotate_questionnaire_token(
+                cid,
+                "self",
+                now=datetime(2026, 9, 7, 10, 0, tzinfo=timezone.utc),
+            )
+            candidate_store.save_json(cid, "self_assess.json", self_assess)
+            candidate_store.save_json(cid, "hr_assess.json", hr_assess)
+            candidate_store.update(
+                cid,
+                self_submitted_at=self_assess["submitted_at"],
+                hr_submitted_at=hr_assess["submitted_at"],
+                assessed_at="2026-09-07T09:30:00+00:00",
+                status="ASSESSED",
+            )
+            facts = candidate_store.candidate_workflow_facts(cid)
+            source_versions = facts["source_versions"]
+            assessment_identity = {
+                "cid": cid,
+                "source_versions": source_versions,
+                "template_version": template_version,
+            }
+            assessment_version_id = (
+                "cav_"
+                + hashlib.sha256(
+                    json.dumps(
+                        assessment_identity,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    ).encode("utf-8")
+                ).hexdigest()[:24]
+            )
+            assessment = {
+                "assessment_version_id": assessment_version_id,
+                "band": {"p25": 18000, "p50": 20000, "p75": 23000},
+                "confidence": "MEDIUM",
+                "divergence": {"divergent": [], "high_divergence": False},
+                "leveling": {"effective_billing_wan": 72.0, "grade": "C1"},
+                "source_versions": source_versions,
+                "status": "OK",
+                "template_version": template_version,
+            }
+            candidate_store.save_json(
+                cid, f"assessment_{assessment_version_id}.json", assessment
+            )
+            candidate_store.update(
+                cid, latest_assessment_version_id=assessment_version_id
+            )
+            profile = candidate_store.get(cid)
+            assert profile is not None
+            detail = {
+                "completion": facts["completion"],
+                "hr_assess": hr_assess,
+                "latest_assessment": assessment,
+                "latest_assessment_version_id": assessment_version_id,
+                "profile": profile,
+                "questionnaire": {
+                    **facts["questionnaire"],
+                    "template_id": template["template_id"],
+                    "template_version": template_version,
+                },
+                "self_assess": self_assess,
+                "source_versions": source_versions,
+            }
+            snapshot_without_hash = {
+                "candidate": {
+                    "name": profile["name"],
+                    "notes": profile["notes"],
+                    "target_line": profile["target_line"],
+                },
+                "cid": cid,
+                "deterministic_assessment": {
+                    "assessment_version_id": assessment_version_id,
+                    "result": assessment,
+                },
+                "hr_response": {
+                    "answers": hr_assess["answers"],
+                    "interviewer": hr_assess["interviewer"],
+                    "scores": hr_assess["scored"],
+                    "submission_version": source_versions["hr"],
+                },
+                "questionnaire": {
+                    "template_id": template["template_id"],
+                    "template_version": template_version,
+                },
+                "schema_version": "candidate_assessment_input_v1",
+                "self_response": {
+                    "answers": self_assess["answers"],
+                    "scores": self_assess["scored"],
+                    "submission_version": source_versions["self"],
+                },
+                "workflow_id": workflow_id,
+            }
+            input_snapshot_hash = _content_version(snapshot_without_hash)
+            report_id = (
+                "car_"
+                + hashlib.sha256(
+                    f"{workflow_id}:{input_snapshot_hash}".encode("utf-8")
+                ).hexdigest()[:24]
+            )
+            report_artifact = {
+                "assessment_version_id": assessment_version_id,
+                "cid": cid,
+                "confirmed_by": "synthetic-user",
+                "created_at": "2026-09-07T10:00:00+00:00",
+                "created_by": "federation",
+                "generator": {
+                    "prompt_version": "candidate-assessment-report-v1",
+                    "workflow_key": "candidate_assessment_report",
+                    "workflow_version": "2026-09-07.1",
+                },
+                "input_snapshot_hash": input_snapshot_hash,
+                "renderer_version": "candidate-assessment-html-v1",
+                "report": _private_report(input_snapshot_hash),
+                "report_id": report_id,
+                "report_version": 1,
+                "schema_version": "candidate_assessment_report_v1",
+                "workflow_id": workflow_id,
+                "workflow_run_id": f"{workflow_id}:attempt:1",
+            }
+            stored = candidate_report_store.archive_report(
+                cid, report_artifact, expected_version=1
+            )
+            reread = candidate_report_store.get_report_version(cid, report_id, 1)
+            assert reread == stored
+            report_metadata = {
+                "artifact_hash": stored["artifact_hash"],
+                "assessment_version_id": stored["assessment_version_id"],
+                "cid": stored["cid"],
+                "input_snapshot_hash": stored["input_snapshot_hash"],
+                "report_id": stored["report_id"],
+                "report_schema_version": stored["schema_version"],
+                "report_version": stored["report_version"],
+                "response_shape": sorted(stored),
+                "workflow_id": stored["workflow_id"],
+            }
+        finally:
+            candidate_store.CANDIDATES_DIR = original_store_root
+            candidate_report_store.CANDIDATES_DIR = original_report_root
+
+    dimension_ids = list(DIM_IDS)
     return {
         "assessment_metadata": {
             "assessment_version_id": assessment_version_id,
@@ -232,11 +314,50 @@ def candidate_assessment_contract_fixture() -> dict:
             "source_versions": source_versions,
             "template_id": "consultant_v1",
             "template_version": template_version,
+            "dimension_ids": dimension_ids,
         },
-        "candidate_detail": detail,
+        "candidate_detail": {
+            "completion": facts["completion"],
+            "latest_assessment": {
+                "assessment_version_id": assessment_version_id,
+                "dimension_ids": dimension_ids,
+                "source_versions": source_versions,
+                "status": assessment["status"],
+                "template_version": template_version,
+            },
+            "latest_assessment_version_id": assessment_version_id,
+            "profile": {
+                "cid": cid,
+                "latest_assessment_version_id": assessment_version_id,
+                "name": profile["name"],
+                "status": profile["status"],
+            },
+            "questionnaire": {
+                "template_id": template["template_id"],
+                "template_version": template_version,
+            },
+            "response_shape": sorted(detail),
+            "responses": {
+                "hr": {
+                    "dimension_ids": dimension_ids,
+                    "present": True,
+                    "role": "hr",
+                    "source_version": source_versions["hr"],
+                    "template_version": template_version,
+                },
+                "self": {
+                    "dimension_ids": dimension_ids,
+                    "present": True,
+                    "role": "self",
+                    "source_version": source_versions["self"],
+                    "template_version": template_version,
+                },
+            },
+            "source_versions": source_versions,
+        },
         "questionnaire_token_rotation": {
             "cid": cid,
-            "expires_at": "2026-09-09T10:00:00+00:00",
+            "expires_at": rotation["expires_at"],
             "raw_token_included": False,
             "role": "self",
             "url_path_prefix": "/q/",
@@ -272,6 +393,18 @@ def _assert_contract_is_sanitized(payload: dict) -> None:
     }
     assert "report" not in payload["report_read"]
 
+    def reject_response_bodies(value: object) -> None:
+        if isinstance(value, dict):
+            forbidden_body_keys = {"answers", "scored", "report"} & set(value)
+            assert not forbidden_body_keys, forbidden_body_keys
+            for child in value.values():
+                reject_response_bodies(child)
+        elif isinstance(value, list):
+            for child in value:
+                reject_response_bodies(child)
+
+    reject_response_bodies(payload)
+
 
 def _certify_external_contract(path: str) -> None:
     expected = _canonical_json(candidate_assessment_contract_fixture())
@@ -291,7 +424,6 @@ if __name__ == "__main__" and len(sys.argv) >= 2:
         print(f"candidate assessment contract certified: sha256:{CONTRACT_SHA256}")
         raise SystemExit(0)
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi.testclient import TestClient
 TMP = os.environ["HEADHUNT_DATA_DIR"]
 from api.main import app
@@ -360,6 +492,13 @@ def test_cross_service_contract_fixture_is_deterministic_and_sanitized():
     assert digest == CONTRACT_SHA256
     assert payload["report_read"] == payload["report_create"]
     assert payload["candidate_detail"]["completion"] == {"self": True, "hr": True}
+    assert payload["assessment_metadata"]["dimension_ids"] == [
+        "performance",
+        "domain",
+        "speed",
+        "stability",
+        "compliance",
+    ]
 
 
 if __name__ == "__main__":
