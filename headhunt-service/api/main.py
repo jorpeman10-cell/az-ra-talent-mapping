@@ -3,10 +3,12 @@
 import os
 import json
 import glob
+import hmac
 from datetime import datetime
+from typing import Literal
 
 import yaml
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -177,7 +179,8 @@ from datetime import timezone
 from candidate.store import (new_candidate, get as get_candidate,
                              update as update_candidate, list_candidates,
                              validate_token, validate_hr_token, save_json,
-                             load_json, derive_status, CONFIG_DIR)
+                             load_json, derive_status, candidate_workflow_facts,
+                             rotate_questionnaire_token, CONFIG_DIR)
 from candidate.store import DATA_DIR as CAND_DATA_DIR
 from candidate.questionnaire import default_template, validate_template, score_questionnaire
 from candidate import engine as cand_engine
@@ -231,6 +234,17 @@ class SubmitIn(BaseModel):
 class HrAssessIn(BaseModel):
     answers: dict
     interviewer: str = ""
+
+
+class RotateQuestionnaireIn(BaseModel):
+    role: Literal["self", "hr"]
+
+
+def _verify_internal_token(x_headhunt_internal_token: str = Header(default="")):
+    expected = os.environ.get("HEADHUNT_INTERNAL_SECRET", "").strip()
+    supplied = str(x_headhunt_internal_token or "")
+    if not expected or not hmac.compare_digest(supplied, expected):
+        raise HTTPException(401, "internal_auth_required")
 
 
 def _token_http_error(reason):
@@ -330,13 +344,48 @@ def api_candidates():
 def api_candidate_detail(cid: str):
     rec = _get_checked(cid)
     rec["status"] = derive_status(rec)
+    public_profile = {
+        key: value
+        for key, value in rec.items()
+        if key not in ("token", "hr_token")
+    }
     latest = None
     for fname in sorted(os.listdir(store_dir(cid)), reverse=True):
         if fname.startswith("assessment_") and fname.endswith(".json"):
             latest = load_json(cid, fname)
             break
-    return {"profile": rec, "self_assess": load_json(cid, "self_assess.json"),
-            "hr_assess": load_json(cid, "hr_assess.json"), "latest_assessment": latest}
+    facts = candidate_workflow_facts(cid)
+    return {"profile": public_profile,
+            "self_assess": load_json(cid, "self_assess.json"),
+            "hr_assess": load_json(cid, "hr_assess.json"),
+            "latest_assessment": latest,
+            "completion": facts["completion"],
+            "source_versions": facts["source_versions"],
+            "questionnaire": facts["questionnaire"],
+            "latest_assessment_version_id": None}
+
+
+@app.post("/api/internal/candidate/{cid}/questionnaire-token/rotate")
+def api_rotate_questionnaire_token(
+    cid: str,
+    body: RotateQuestionnaireIn,
+    x_headhunt_internal_token: str = Header(default=""),
+):
+    _verify_internal_token(x_headhunt_internal_token)
+    _get_checked(cid)
+    try:
+        rotated = rotate_questionnaire_token(cid, body.role)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    prefix = "/q/" if body.role == "self" else "/h/"
+    return {
+        "cid": cid,
+        "role": body.role,
+        "url": prefix + rotated["token"],
+        "expires_at": rotated["expires_at"],
+    }
 
 
 def store_dir(cid):
