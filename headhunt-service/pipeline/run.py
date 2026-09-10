@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from .collect import collect_all
 from .cleaning import clean_quarterly_revenue, clean_company_summary, compute_self_ratio
+from .cleaning import quarterly_active_clients, deals_last_12m
 from .loaders import load_salary_map, load_cost_map
 from .engine import (calculate_advisor_profile, determine_market_phase,
                      calculate_effective_capacity, evaluate_advisor,
@@ -33,6 +34,7 @@ def load_config(config_path):
             "default_overhead_annual": cfg["cost"]["default_overhead_annual"],
             "departed_names": frozenset(cfg.get("hr", {}).get("departed_names", [])),
             "salary_overrides": dict(cfg.get("hr", {}).get("salary_overrides", {}) or {}),
+            "risk": cfg.get("risk", {}),
             "since": cfg["collect"]["since"],
             "paths": cfg["data"]}
     return flat
@@ -42,32 +44,67 @@ def _base_dir(config_path):
     return os.path.dirname(os.path.dirname(os.path.abspath(config_path)))
 
 
-def build_activity_map(activity_rows, now):
-    """面试活动 -> {advisor_id: {itv_cv, itv_qoq}}"""
+def build_activity_map(activity_rows, now, join_dates=None):
+    """面试/推荐活动 -> {advisor_id: {itv_cv, itv_qoq, itv_mean, rec_cv}}
+
+    itv_cv/itv_qoq: 面试口径波动与动量（原有）
+    itv_mean: 面试季均值（场/季）
+    rec_cv: 推荐量季度 CV（实证：推荐量波动预测回款波动 ρ=+0.57，进 CV 先验）
+
+    join_dates: {advisor_id: joinInDate} — 窗口从入职季度起算；
+    入职前的季度不计零（否则新人的活动 CV 被预入职零值严重高估）。
+    """
     if not activity_rows:
         return {}
-    itv = {}
-    for r in activity_rows.get("interview", []):
-        itv.setdefault(str(r["advisor_id"]), {})[(int(r["year"]), int(r["quarter"]))] = int(r["cnt"])
+    join_dates = join_dates or {}
+
+    def _join_idx(aid):
+        jd = join_dates.get(aid)
+        if not jd:
+            return None
+        try:
+            d = datetime.fromisoformat(str(jd)[:10])
+            return d.year * 4 + (d.month - 1) // 3 + 1
+        except ValueError:
+            return None
+
+    def _series(rows):
+        m = {}
+        for r in rows:
+            m.setdefault(str(r["advisor_id"]), {})[(int(r["year"]), int(r["quarter"]))] = int(r["cnt"])
+        return m
+
+    itv = _series(activity_rows.get("interview", []))
+    rec = _series(activity_rows.get("recommend", []))
     cur_y, cur_q = now.year, (now.month - 1) // 3 + 1
 
     def qidx(yq): return yq[0] * 4 + yq[1]
     def fromidx(i): return (i // 4, i % 4) if i % 4 else (i // 4 - 1, 4)
 
     end = qidx((cur_y, cur_q))
-    out = {}
-    for aid, qm in itv.items():
-        series = [qm.get(fromidx(i), 0) for i in range(end - 7, end + 1)]
+
+    def _stats(aid, qm, min_total=8):
+        start = end - 7
+        ji = _join_idx(aid)
+        if ji is not None:
+            start = max(start, ji)
+        series = [qm.get(fromidx(i), 0) for i in range(start, end + 1)]
         total = sum(series)
-        if total < 8:
-            out[aid] = {"itv_cv": None, "itv_qoq": 0.0}
-            continue
-        m = total / 8
-        sd = math.sqrt(sum((x - m) ** 2 for x in series) / 8)
+        if total < min_total:
+            return None, 0.0, 0.0
+        m = total / len(series)
+        sd = math.sqrt(sum((x - m) ** 2 for x in series) / len(series))
+        return (round(sd / m, 4) if m > 0 else None), round(m, 2), 0.0
+
+    out = {}
+    for aid in set(itv) | set(rec):
+        itv_cv, itv_mean, _ = _stats(aid, itv.get(aid, {}))
+        rec_cv, _, _ = _stats(aid, rec.get(aid, {}))
+        series = [itv.get(aid, {}).get(fromidx(i), 0) for i in range(end - 7, end + 1)]
         recent2, prev2 = sum(series[-2:]), sum(series[-4:-2])
         qoq = (recent2 - prev2) / prev2 if prev2 > 0 else 0.0
-        out[aid] = {"itv_cv": round(sd / m, 4) if m > 0 else None,
-                    "itv_qoq": round(qoq, 4)}
+        out[aid] = {"itv_cv": itv_cv, "itv_qoq": round(qoq, 4),
+                    "itv_mean": itv_mean, "rec_cv": rec_cv}
     return out
 
 
@@ -141,7 +178,9 @@ def run_pipeline(config_path, use_cache=True, as_of=None):
     cost_map, cost_skipped = load_cost_map(
         P["cost_xlsx"], overhead_mode=cfg["overhead_mode"],
         departed_names=cfg["departed_names"])
-    activity_map = build_activity_map(activity_rows, now)
+    activity_map = build_activity_map(
+        activity_rows, now,
+        join_dates={str(a["advisor_id"]): a.get("joinInDate") for a in raw["advisors"]})
     pipeline_map = {}
     for f_ in raw.get("F", []):
         rec, stale = float(f_["received_cnt"] or 0), float(f_["stale_unpaid_cnt"] or 0)
@@ -152,13 +191,25 @@ def run_pipeline(config_path, use_cache=True, as_of=None):
             "outlier_cnt": int(f_.get("outlier_cnt") or 0)}
 
     # ---- 逐顾问决策 ----
+    client_q_map = quarterly_active_clients(raw.get("C", []))
+    deals_map = deals_last_12m(raw.get("C", []), as_of=now)
+    COMPANY_MEDIAN_DEAL_PRICE = 42.9  # 万/单（C 表客单价中位数, 2026-09 实证; 无成单新人的 M 估计分母）
     decisions = []
     for aid, adv in advisors.items():
         profile = calculate_advisor_profile(aid, adv["quarters"], company_series,
                                             self_ratio=self_ratio.get(aid))
         pl = pipeline_map.get(aid)
         act = activity_map.get(aid)
-        capacity = calculate_effective_capacity(profile, market, pipeline=pl, activity=act)
+        deals_12m = deals_map.get(aid)
+        if not deals_12m and pl and pl.get("signed_12m_wan"):
+            # 新人通道: C 表无成单记录时, 用在途签约额 ÷ 公司客单价中位数估计 M;
+            # 下限 1.0——先验回归训练范围 M∈[3,24], 不外推到更低(子任务 8.4 警示)
+            deals_12m = max(1.0, pl["signed_12m_wan"] / COMPANY_MEDIAN_DEAL_PRICE)
+        capacity = calculate_effective_capacity(
+            profile, market, pipeline=pl, activity=act,
+            deals_12m=deals_12m,
+            client_series=client_q_map.get(aid),
+            risk=cfg.get("risk"))
         recent4 = get_last_n_quarters(adv["quarters"], 4)
 
         ecfg = {"discount_rate": cfg["discount_rate"], "attrition_rate": cfg["attrition_rate"],

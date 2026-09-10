@@ -15,6 +15,16 @@ def build_rationale(d: dict) -> str:
         lines.append(
             "⚠️ 新人通道: 该顾问无回款历史(入职以来无业绩产出/调任), "
             "产能完全基于在途签约管道估算, 置信度 LOW, 结果仅供观察期参考。")
+    monitoring = c.get("monitoring") or {}
+    if monitoring.get("churn_alert"):
+        lines.append(
+            f"⚠️ 客户流失预警: 活跃客户数连续 2 季下降"
+            f"(Δ2季={monitoring.get('client_delta_2q')}), 折减已加厚 5pp。")
+    quantiles = c.get("quantiles") or {}
+    if quantiles:
+        lines.append(
+            f"   三档情景: 悲观档产能 {quantiles.get('p25')}万 / 基准档 {quantiles.get('p50')}万 "
+            f"/ 乐观档 {quantiles.get('p75')}万（收缩后 CV={c.get('cv_used')}，先验 {c.get('cv_prior')}）。")
     lines += [
         f"1. 产能: 季度中枢 μ={p['mu']}万, 波动率 CV={c.get('cv_used', p['cv'])}"
         f"({'面试口径' if c.get('cv_source') == 'interview' else '回款口径'}), "

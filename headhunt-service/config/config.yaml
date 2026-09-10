@@ -44,6 +44,21 @@ hr:
   # 魏菲：市场部实际 7000底薪+2000职位工资=9000（Steven 2026-09-04 确认；表内市场行 9100+2000 有误）
   salary_overrides: {"魏菲": 9000}
 
+# 三层风险结构参数（2026-09-05 实证标定，见 docs/2026-09-05-三层风险结构-引擎改造方案.md）
+risk:
+  # L1 CV 先验回归系数（精简模型，n=24，LOOCV R²=0.32；prd_analysis/results.md §8）
+  cv_prior:
+    a: 1.6716          # 截距
+    b1: -0.4454        # ln(年成单量 M)
+    b2: 0.3667         # 推荐量季 CV
+    k: 8               # 贝叶斯混合强度（n=有效季度数）
+    clip_min: 0.1
+    clip_max: 2.5      # 新人通道外推保护（魏菲类 M<3 的外推）
+  # L2 客户流失预警：连续 2 季活跃客户数下降 → 折减加厚（只加不减）
+  churn_addon_pp: 5
+  # L3 分位情景：回款序列分位年化过折减链（数据驱动，无新先验）
+  quantiles: [0.25, 0.5, 0.75]
+
 data:
   salary_csv: data/salary_detail.csv
   cost_xlsx: data/cost_split.xlsx

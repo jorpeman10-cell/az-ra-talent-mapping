@@ -161,3 +161,48 @@ def compute_self_ratio(client_rows):
         if str(r.get("source_type", "")).upper() in ("SELF", "顾问开发"):
             a["self"] += rev
     return {aid: (a["self"] / a["total"] if a["total"] else 0.0) for aid, a in agg.items()}
+
+
+def quarterly_active_clients(project_rows):
+    """表C 项目明细 -> {advisor_id: {(year, quarter): 当季活跃客户数}}
+
+    活跃 = 当季有签约动作（signDate 落在该季度）的去重 client_id。
+    用于 L2 客户流失监测（连续 2 季下降 → 折减加点）。
+    """
+    from datetime import datetime
+    out = {}
+    for r in project_rows:
+        raw = r.get("signDate")
+        if not raw:
+            continue
+        try:
+            d = datetime.fromisoformat(str(raw)[:10])
+        except ValueError:
+            continue
+        key = (d.year, (d.month - 1) // 3 + 1)
+        aid = str(r["advisor_id"])
+        cid = r.get("client_id")
+        if cid is None:
+            continue
+        out.setdefault(aid, {}).setdefault(key, set()).add(cid)
+    return {aid: {k: len(v) for k, v in qs.items()} for aid, qs in out.items()}
+
+
+def deals_last_12m(project_rows, as_of=None):
+    """表C -> {advisor_id: 近12月成单数（signDate 在窗口内）}，CV 先验的 M 输入。"""
+    from datetime import datetime
+    as_of = as_of or datetime.now()
+    out = {}
+    for r in project_rows:
+        raw = r.get("signDate")
+        if not raw:
+            continue
+        try:
+            d = datetime.fromisoformat(str(raw)[:10])
+        except ValueError:
+            continue
+        if (as_of - d).days > 366:
+            continue
+        aid = str(r["advisor_id"])
+        out[aid] = out.get(aid, 0) + 1
+    return out

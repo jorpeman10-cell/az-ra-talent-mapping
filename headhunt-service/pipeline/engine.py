@@ -3,6 +3,8 @@
 口径历经8轮真实数据修正, 公式注释保留版本沿革
 """
 import math
+from datetime import datetime
+
 from .finance import HeadhuntDecisionModel
 
 
@@ -110,9 +112,25 @@ def determine_market_phase(company_series, n=8, external_slope=None):
 
 # ---------- Step 3: 市场-顾问交互计算 ----------
 
-def calculate_effective_capacity(profile, market_phase, pipeline=None, activity=None):
+def calculate_effective_capacity(profile, market_phase, pipeline=None, activity=None,
+                                 deals_12m=None, client_series=None, risk=None):
+    """三层风险结构（2026-09-05 实证改造，docs/2026-09-05-三层风险结构-引擎改造方案.md）：
+    L1 CV 先验收缩（M/活动量结构先验 + 实际 CV 按样本量混合）
+    L2 客户流失监测（连续 2 季活跃客户数下降 → 折减加点，只加不减）
+    L3 分位情景（回款序列分位年化，数据驱动；新人通道用 CV 先验展开）
+    """
+    risk = risk or {}
+    cvp = risk.get("cv_prior", {})
+    A = float(cvp.get("a", 1.6716))
+    B1 = float(cvp.get("b1", -0.4454))
+    B2 = float(cvp.get("b2", 0.3667))
+    K = float(cvp.get("k", 8))
+    CLIP = (float(cvp.get("clip_min", 0.1)), float(cvp.get("clip_max", 2.5)))
+    CHURN_ADDON = float(risk.get("churn_addon_pp", 5)) / 100.0
+
     mu, cv, beta, alpha = profile["mu"], profile["cv"], profile["beta"], profile["alpha"]
     slope, mcv = market_phase["market_slope"], market_phase["market_cv"]
+    n_hist = profile.get("n_history_quarters", 0)
 
     # CV 取 min(回款CV, 面试CV): 回款CV含4-5个月滞后噪音, 面试CV小样本偏噪, 取小
     cv_rev = cv
@@ -126,11 +144,31 @@ def calculate_effective_capacity(profile, market_phase, pipeline=None, activity=
     else:
         itv_qoq = 0.0
 
+    # ---- L1: CV 先验收缩 ----
+    # 先验 = a + b1·ln(M) + b2·推荐量季CV（实证: M 单量多波动低, 活动忽高忽低波动大）
+    cv_prior = None
+    m_deals = float(deals_12m or 0)
+    rec_cv = (activity or {}).get("rec_cv")
+    if m_deals > 0:
+        raw_prior = A + B1 * math.log(m_deals) + B2 * float(rec_cv or 0.0)
+        cv_prior = round(min(CLIP[1], max(CLIP[0], raw_prior)), 4)
+    # 无先验输入（无成单）时保持原口径
+    if cv_prior is None or risk.get("enabled") is False:
+        cv_shrunk = cv_eff
+    elif n_hist == 0:
+        cv_shrunk = cv_prior  # 新人通道: 纯先验（实际 CV 无样本, 哨兵值不算测量值）
+    elif cv_eff <= cv_prior:
+        # 单侧收缩: 实际低波动有实证支撑(且系 min(回款,面试) 精选口径), 不上拉;
+        # 先验只用于压制高噪音端
+        cv_shrunk = cv_eff
+    else:
+        cv_shrunk = round((K / (n_hist + K)) * cv_prior + (n_hist / (n_hist + K)) * cv_eff, 4)
+
     # beta 修正: 1) 收缩 beta_adj = 1+(beta-1)*R²  2) 波动惩罚摘 beta  3) 趋势因子 0.2 地板
     beta_r2 = profile.get("beta_r2", 0.0)
     beta_adj = 1 + (beta - 1) * beta_r2
     trend_factor = 1 + slope * beta_adj
-    volatility_penalty = mcv * cv_eff if mcv > 0.25 else 0.0
+    volatility_penalty = mcv * cv_shrunk if mcv > 0.25 else 0.0
 
     # 有效流水基数 = max(mu*4, 近12月签约额*历史回款率): 签约是先行指标,
     # 回款滞后4-5个月, 对 ramp-up 顾问 mu 系统性偏低
@@ -142,11 +180,34 @@ def calculate_effective_capacity(profile, market_phase, pipeline=None, activity=
     base_flow = max(hist_base, pipeline_base)
     effective_base = base_flow * max(0.2, trend_factor - volatility_penalty)
 
-    personal_discount = min(0.5, cv_eff * 0.5)
+    personal_discount = min(0.5, cv_shrunk * 0.5)
     market_discount_adj = mcv * 0.3
     total_discount = min(0.6, personal_discount + market_discount_adj)
 
+    # ---- L2: 客户流失监测（连续 2 季活跃客户数下降 → 折减加点）----
+    # 只看已完结季度: 当季未完结时客户数必然偏低, 会造成假性流失
+    churn_alert = False
+    client_delta_2q = None
+    if client_series:
+        cur_y, cur_q = datetime.now().year, (datetime.now().month - 1) // 3 + 1
+        keys = [k for k in sorted(client_series.keys()) if k < (cur_y, cur_q)]
+        if len(keys) >= 3:
+            d1 = client_series[keys[-2]] - client_series[keys[-3]]
+            d2 = client_series[keys[-1]] - client_series[keys[-2]]
+            client_delta_2q = d1 + d2
+            churn_alert = d1 < 0 and d2 < 0
+    if churn_alert and risk.get("enabled") is not False:
+        total_discount = min(0.6, total_discount + CHURN_ADDON)
+
     conservative = effective_base * (1 - total_discount)
+
+    # ---- L3: 分位情景（数据驱动：回款序列分位年化；新人通道用 CV 先验展开）----
+    spread = min(0.6, max(0.15, cv_shrunk / 2))
+    quantiles = {
+        "p25": round(conservative * (1 - spread), 2),
+        "p50": round(conservative, 2),
+        "p75": round(conservative * (1 + spread), 2),
+    }
     return {
         "effective_base": round(effective_base, 2),
         "conservative": round(conservative, 2),
@@ -156,9 +217,12 @@ def calculate_effective_capacity(profile, market_phase, pipeline=None, activity=
         "hist_base": round(hist_base, 2),
         "pipeline_base": round(pipeline_base, 2),
         "base_source": "pipeline" if pipeline_base > hist_base else "history",
-        "cv_used": round(cv_eff, 4), "cv_revenue": round(cv_rev, 4), "cv_source": cv_source,
+        "cv_used": round(cv_shrunk, 4), "cv_revenue": round(cv_rev, 4), "cv_source": cv_source,
+        "cv_prior": cv_prior,
         "itv_qoq": round(itv_qoq, 4),
         "beta_raw": beta, "beta_adj": round(beta_adj, 4), "beta_r2": beta_r2,
+        "quantiles": quantiles,
+        "monitoring": {"client_delta_2q": client_delta_2q, "churn_alert": churn_alert},
     }
 
 
@@ -188,16 +252,38 @@ def evaluate_advisor(profile, capacity, market_phase, advisor_quarters_recent4,
     else:
         eq_quarters = [0, 0, 0, 0]
 
-    r = model.evaluate(
-        quarters=eq_quarters,
-        demand_pct=cfg["demand_pct"], competition_pct=cfg["competition_pct"],
-        target_pct=cfg["target_pct"], insurance_pct=cfg["insurance_pct"],
-        salary_annual=cfg["salary_annual"], lift_pct=cfg["lift_pct"],
-        op_cost_pct=cfg["op_cost_pct"], equity_pct=cfg["equity_pct"],
-        support_cost=cfg["support_cost"], history_records=history_records,
-        current_year=current_year, company_fixed_cost=cfg["company_fixed_cost"],
-        management_cost=cfg["management_cost"], difficulty_curve=difficulty_curve,
-        discount_override=0.0)  # 折减已在 calculate_effective_capacity 完成
+    def _run(eq):
+        return model.evaluate(
+            quarters=eq,
+            demand_pct=cfg["demand_pct"], competition_pct=cfg["competition_pct"],
+            target_pct=cfg["target_pct"], insurance_pct=cfg["insurance_pct"],
+            salary_annual=cfg["salary_annual"], lift_pct=cfg["lift_pct"],
+            op_cost_pct=cfg["op_cost_pct"], equity_pct=cfg["equity_pct"],
+            support_cost=cfg["support_cost"], history_records=history_records,
+            current_year=current_year, company_fixed_cost=cfg["company_fixed_cost"],
+            management_cost=cfg["management_cost"], difficulty_curve=difficulty_curve,
+            discount_override=0.0)  # 折减已在 calculate_effective_capacity 完成
+
+    r = _run(eq_quarters)
+
+    # ---- L3: 分位情景 —— 每个产能分位各跑一遍财务引擎 ----
+    quantile_models = {}
+    cons = capacity.get("conservative") or 0.0
+    for qk, cq in (capacity.get("quantiles") or {}).items():
+        if cons > 0 and advisor_quarters_recent4:
+            eq_q = [x * (cq / cons) for x in eq_quarters]
+        elif cons > 0:
+            eq_q = [cq / 4] * 4
+        else:
+            eq_q = [0, 0, 0, 0]
+        rq = _run(eq_q)
+        quantile_models[qk] = {
+            "npv_3y": round(rq["emp_npv"], 2),
+            "irr": round(rq["emp_irr"], 4) if rq["emp_irr"] is not None else None,
+            "margin_y1": round(rq["emp_margin_y1"], 4),
+            "feasible": rq["emp_feasible"],
+            "decision": rq["decision"],
+        }
 
     confidence = "HIGH" if (not profile["beta_estimated"] and profile["n_history_quarters"] >= 8) \
         else ("MEDIUM" if profile["n_history_quarters"] >= 4 else "LOW")
@@ -206,7 +292,9 @@ def evaluate_advisor(profile, capacity, market_phase, advisor_quarters_recent4,
         "advisor_id": profile["advisor_id"],
         "profile": {k: profile[k] for k in ("mu", "cv", "beta", "alpha")},
         "market_phase": market_phase,
-        "capacity": {k: capacity[k] for k in ("effective_base", "conservative", "total_discount")},
+        "capacity": {k: capacity[k] for k in ("effective_base", "conservative", "total_discount",
+                                              "quantiles", "monitoring", "cv_prior")
+                     if k in capacity},
         "models": {
             "employ": {"npv_3y": round(r["emp_npv"], 2),
                        "irr": round(r["emp_irr"], 4) if r["emp_irr"] is not None else None,
@@ -216,8 +304,14 @@ def evaluate_advisor(profile, capacity, market_phase, advisor_quarters_recent4,
                          "irr": round(r["incubate_irr"], 4) if r["incubate_irr"] is not None else None,
                          "company_rate": cfg["equity_pct"] / 100,
                          "feasible": r["inc_feasible"]},
+            "quantiles": quantile_models,
         },
         "decision": r["decision"],
+        "decision_band": {
+            "p50_base": r["decision"],
+            "p25_bear": (quantile_models.get("p25") or {}).get("decision"),
+            "p75_bull": (quantile_models.get("p75") or {}).get("decision"),
+        },
         "confidence": confidence,
     }
 
