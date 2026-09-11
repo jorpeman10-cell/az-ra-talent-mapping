@@ -297,6 +297,9 @@ def _maybe_notify_completion(cid, force=False):
         return False
     if not rec.get("self_submitted_at") or not rec.get("hr_submitted_at"):
         return False
+    if not rec.get("review_token"):
+        # 本功能上线前的存量档案无审核令牌, 不生成残缺的审核链接
+        return False
     if rec.get("completion_notified_at") and not force:
         return True
     url = os.environ.get("FEDERATION_QUESTIONNAIRE_EVENT_URL", "").strip()
