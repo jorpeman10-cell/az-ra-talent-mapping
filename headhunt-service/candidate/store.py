@@ -13,6 +13,7 @@ CONFIG_DIR = os.environ.get("HEADHUNT_CONFIG_DIR") or os.path.join(BASE, "config
 CANDIDATES_DIR = os.path.join(DATA_DIR, "candidates")
 TOKEN_TTL_HOURS = 48          # self-assess token (single use)
 HR_TOKEN_TTL_HOURS = 168      # HR interview-assess token, 7 days (independent)
+REVIEW_TOKEN_TTL_HOURS = 720  # HR review page token, 30 days (read + confirm only)
 
 
 def _now():
@@ -29,16 +30,20 @@ def _write(cid, fname, obj):
         json.dump(obj, f, ensure_ascii=False, indent=1)
 
 
-def new_candidate(name, target_line="", notes=""):
+def new_candidate(name, target_line="", notes="", created_by=""):
     cid = _cid()
     rec = {
         "cid": cid, "name": name, "target_line": target_line or "", "notes": notes or "",
+        "created_by": created_by or "",
         "created_at": _now().isoformat(),
         "token": secrets.token_urlsafe(24),
         "token_expires_at": (_now() + timedelta(hours=TOKEN_TTL_HOURS)).isoformat(),
         "hr_token": secrets.token_urlsafe(24),
         "hr_token_expires_at": (_now() + timedelta(hours=HR_TOKEN_TTL_HOURS)).isoformat(),
+        "review_token": secrets.token_urlsafe(24),
+        "review_token_expires_at": (_now() + timedelta(hours=REVIEW_TOKEN_TTL_HOURS)).isoformat(),
         "self_submitted_at": None, "hr_submitted_at": None, "assessed_at": None,
+        "completion_notified_at": None, "hr_reviewed_at": None,
         "status": "CREATED",
     }
     _write(cid, "profile.json", rec)
@@ -148,7 +153,8 @@ def list_candidates():
         rec = get(cid)
         if rec:
             # status is derived, not read from the stored field (it goes stale)
-            out.append({k: rec.get(k) for k in ("cid", "name", "created_at",
+            out.append({k: rec.get(k) for k in ("cid", "name", "created_at", "created_by",
+                                                "completion_notified_at", "hr_reviewed_at",
                                                 "self_submitted_at", "hr_submitted_at", "assessed_at")}
                        | {"status": derive_status(rec)})
     return out
@@ -187,6 +193,20 @@ def validate_hr_token(token, now=None):
             return cid, None
     return None, "not_found"
 
+
+def validate_review_token(token, now=None):
+    """HR review-page token: read-only + confirm; does not expire on use."""
+    now = now or _now()
+    if not os.path.isdir(CANDIDATES_DIR):
+        return None, "not_found"
+    for cid in os.listdir(CANDIDATES_DIR):
+        rec = get(cid)
+        if rec and rec.get("review_token") == token:
+            expires = rec.get("review_token_expires_at")
+            if expires and now > datetime.fromisoformat(expires):
+                return None, "expired"
+            return cid, None
+    return None, "not_found"
 
 def derive_status(rec):
     if rec.get("assessed_at"):

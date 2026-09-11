@@ -93,7 +93,7 @@ async function submit() {
     headers: {"Content-Type": "application/json"}, body: JSON.stringify({answers})});
   if (r.ok) {
     document.getElementById("app").innerHTML =
-      `<div class="state">✅ 已提交，感谢配合。后续请保持电话畅通。</div>`;
+      `<div class="state">✅ 已提交，感谢配合。HR 将完成评估后与您联系，无需其他操作。</div>`;
     document.getElementById("bar").style.display = "none";
   } else if (r.status === 422) {
     document.getElementById("err").textContent = "提交被拒：请检查必填项";

@@ -100,8 +100,15 @@ async function submit() {
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({answers, interviewer: INTERVIEWER.trim()})});
   if (r.ok) {
-    document.getElementById("app").innerHTML =
-      `<div class="state">✅ 面评已存档</div>`;
+    const out = await r.json();
+    if (out.peer_submitted && out.query) {
+      document.getElementById("app").innerHTML =
+        `<div class="state">✅ 面评已存档，双问卷已齐。<br><br>
+         <button class="primary" onclick="goAgent('${out.query.replace(/'/g, "")}', '${out.agent_url}')">去 Agent 出定岗定级报告</button></div>`;
+    } else {
+      document.getElementById("app").innerHTML =
+        `<div class="state">✅ 面评已存档，等待候选人完成自评问卷。</div>`;
+    }
     document.getElementById("bar").style.display = "none";
   } else if (r.status === 422) {
     document.getElementById("err").textContent = "提交被拒：请检查必填项";

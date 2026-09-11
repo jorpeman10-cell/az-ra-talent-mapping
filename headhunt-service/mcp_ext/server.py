@@ -73,5 +73,21 @@ def headhunt_rerun(fresh: bool = False) -> dict:
             "market": res["market"], "generated_at": res["board"]["generated_at"]}
 
 
+@mcp.tool()
+def headhunt_candidate_intake(name: str, target_line: str = "", notes: str = "", created_by: str = "") -> dict:
+    """外部顾问候选人建档(面试信息采集): 创建候选人记录, 返回自评问卷链接和 HR 评估链接。
+    自评问卷公网可达(token-only): 把 self_url 发给候选人填写, HR 用 hr_url 做面试评估。
+    name: 候选人姓名(必填); target_line: 目标职能线(如'临床运营'); notes: 备注(如来源/推荐人)。"""
+    if not name.strip():
+        raise ValueError("候选人姓名不能为空")
+    from candidate.store import new_candidate
+    rec = new_candidate(name.strip(), target_line.strip(), notes.strip(), created_by=created_by.strip())
+    base = os.environ.get("HEADHUNT_PUBLIC_BASE", "https://www.hiijob.cn").rstrip("/")
+    return {"cid": rec["cid"], "name": rec["name"], "status": rec["status"],
+            "self_url": f"{base}/q/{rec['token']}",
+            "hr_url": f"{base}/h/{rec['hr_token']}",
+            "expires_at": rec["token_expires_at"]}
+
+
 if __name__ == "__main__":
     mcp.run(transport="streamable-http")

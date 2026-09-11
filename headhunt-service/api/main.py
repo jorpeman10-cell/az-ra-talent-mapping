@@ -5,8 +5,9 @@ import json
 import glob
 import hmac
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
+from urllib.request import Request as _UrlRequest, urlopen as _urlopen
 
 import yaml
 from fastapi import FastAPI, Header, HTTPException
@@ -181,7 +182,8 @@ from candidate.store import (new_candidate, get as get_candidate,
                              update as update_candidate, list_candidates,
                              validate_token, validate_hr_token, save_json,
                              load_json, derive_status, candidate_workflow_facts,
-                             rotate_questionnaire_token, CONFIG_DIR)
+                             rotate_questionnaire_token, validate_review_token,
+                             CONFIG_DIR)
 from candidate.store import DATA_DIR as CAND_DATA_DIR
 from candidate.questionnaire import default_template, validate_template, score_questionnaire
 from candidate import engine as cand_engine
@@ -231,6 +233,7 @@ class IntakeIn(BaseModel):
     name: str
     target_line: str = ""
     notes: str = ""
+    created_by: str = ""
 
 
 class SubmitIn(BaseModel):
@@ -272,6 +275,49 @@ def _verify_internal_token(x_headhunt_internal_token: str = Header(default="")):
         raise HTTPException(401, "internal_auth_required")
 
 
+PUBLIC_BASE = os.environ.get("HEADHUNT_PUBLIC_BASE", "https://www.hiijob.cn").rstrip("/")
+AGENT_URL = os.environ.get("HEADHUNT_AGENT_URL", f"{PUBLIC_BASE}/").rstrip("/") + "/"
+
+
+def _completion_payload(cid, rec):
+    return {"cid": cid, "name": rec.get("name") or "",
+            "created_by": rec.get("created_by") or "",
+            "review_url": f"{PUBLIC_BASE}/r/{rec.get('review_token')}",
+            "completed_at": datetime.now(timezone.utc).isoformat()}
+
+
+def _maybe_notify_completion(cid, force=False):
+    """双问卷首次齐全 → 通知 Federation（站内信 + 工作台任务卡）。
+
+    幂等: completion_notified_at 已落则跳过; 通知失败不阻断提交,
+    可用 POST /api/candidate/{cid}/notify-completion 手动重放(force=True)。
+    未配置 FEDERATION_QUESTIONNAIRE_EVENT_URL 时静默跳过(本地默认)。"""
+    rec = get_candidate(cid)
+    if not rec:
+        return False
+    if not rec.get("self_submitted_at") or not rec.get("hr_submitted_at"):
+        return False
+    if rec.get("completion_notified_at") and not force:
+        return True
+    url = os.environ.get("FEDERATION_QUESTIONNAIRE_EVENT_URL", "").strip()
+    if not url:
+        return False
+    payload = _completion_payload(cid, rec)
+    token = os.environ.get("HEADHUNT_EVENT_TOKEN", "").strip()
+    try:
+        req = _UrlRequest(
+            url, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "X-Headhunt-Event-Token": token}, method="POST")
+        with _urlopen(req, timeout=5) as resp:
+            if 200 <= resp.status < 300:
+                update_candidate(cid, completion_notified_at=payload["completed_at"])
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def _token_http_error(reason):
     return HTTPException(410 if reason in ("expired", "already_submitted") else 404, reason)
 
@@ -280,7 +326,8 @@ def _token_http_error(reason):
 def api_candidate_intake(body: IntakeIn):
     if not body.name.strip():
         raise HTTPException(422, "name required")
-    rec = new_candidate(body.name.strip(), body.target_line, body.notes)
+    rec = new_candidate(body.name.strip(), body.target_line, body.notes,
+                        created_by=body.created_by.strip())
     return {"cid": rec["cid"], "name": rec["name"], "status": rec["status"],
             "self_url": f"/q/{rec['token']}", "expires_at": rec["token_expires_at"],
             "hr_url": f"/h/{rec['hr_token']}"}
@@ -313,7 +360,11 @@ def api_q_submit(token: str, body: SubmitIn):
     save_json(cid, "self_assess.json", {"scored": result, "answers": body.answers})
     update_candidate(cid, self_submitted_at=datetime.now(timezone.utc).isoformat(),
                      status="SELF_DONE")
-    return {"ok": True, "status": "SELF_DONE"}
+    rec = get_candidate(cid)
+    notified = _maybe_notify_completion(cid)
+    return {"ok": True, "status": "SELF_DONE",
+            "peer_submitted": bool(rec.get("hr_submitted_at")),
+            "completion_notified": notified}
 
 
 @app.get("/h/{token}")
@@ -345,7 +396,60 @@ def api_h_submit(token: str, body: HrAssessIn):
                "submitted_at": datetime.now(timezone.utc).isoformat()})
     update_candidate(cid, hr_submitted_at=datetime.now(timezone.utc).isoformat(),
                      status="HR_DONE")
-    return {"ok": True, "status": derive_status(get_candidate(cid))}
+    rec = get_candidate(cid)
+    both_done = bool(rec.get("self_submitted_at"))
+    notified = _maybe_notify_completion(cid)
+    out = {"ok": True, "status": derive_status(rec),
+           "peer_submitted": both_done, "completion_notified": notified}
+    if both_done:
+        out["query"] = f"{rec.get('name')} 的定岗定级"
+        out["agent_url"] = AGENT_URL
+        out["review_url"] = f"{PUBLIC_BASE}/r/{rec.get('review_token')}"
+    return out
+
+
+@app.post("/api/candidate/{cid}/notify-completion")
+def api_notify_completion(cid: str):
+    _get_checked(cid)
+    rec = get_candidate(cid)
+    if not rec.get("self_submitted_at") or not rec.get("hr_submitted_at"):
+        raise HTTPException(409, "questionnaires incomplete")
+    if rec.get("completion_notified_at"):
+        return {"ok": True, "completion_notified_at": rec["completion_notified_at"]}
+    if not _maybe_notify_completion(cid, force=True):
+        raise HTTPException(502, "notify failed or event url not configured")
+    return {"ok": True, "completion_notified_at": get_candidate(cid).get("completion_notified_at")}
+
+
+@app.get("/r/{token}")
+def r_page(token: str):
+    return FileResponse(os.path.join(BASE, "web", "r.html"))
+
+
+@app.get("/api/r/{token}/review")
+def api_review(token: str):
+    cid, reason = validate_review_token(token)
+    if not cid:
+        raise _token_http_error(reason)
+    rec = get_candidate(cid)
+    return {"cid": cid, "name": rec.get("name"),
+            "self": load_json(cid, "self_assess.json"),
+            "hr": load_json(cid, "hr_assess.json"),
+            "hr_reviewed_at": rec.get("hr_reviewed_at"),
+            "assessed_at": rec.get("assessed_at"),
+            "query": f"{rec.get('name')} 的定岗定级", "agent_url": AGENT_URL}
+
+
+@app.post("/api/r/{token}/confirm")
+def api_review_confirm(token: str):
+    cid, reason = validate_review_token(token)
+    if not cid:
+        raise _token_http_error(reason)
+    rec = get_candidate(cid)
+    if not rec.get("hr_reviewed_at"):
+        update_candidate(cid, hr_reviewed_at=datetime.now(timezone.utc).isoformat())
+    return {"ok": True, "hr_reviewed_at": get_candidate(cid).get("hr_reviewed_at"),
+            "query": f"{rec.get('name')} 的定岗定级", "agent_url": AGENT_URL}
 
 
 @app.post("/api/candidate/{cid}/hr-assess")

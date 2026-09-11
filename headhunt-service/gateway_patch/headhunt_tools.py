@@ -47,3 +47,25 @@ def headhunt_salary_scan(name_or_id: str, scenario: str = "B") -> dict:
     if "error" in d:
         return d
     return _hh_get(f"/api/advisor/{d['advisor_id']}/salary_scan?scenario={scenario}")
+def _hh_post(path: str, body: dict) -> dict:
+    req = urllib.request.Request(
+        f"{HEADHUNT_API}{path}", method="POST",
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+# @mcp.tool()
+def headhunt_candidate_intake(name: str, target_line: str = "", notes: str = "", created_by: str = "") -> dict:
+    """外部顾问候选人建档(面试信息采集): 返回候选人自评问卷链接(self_url, 公网 token-only)
+    和 HR 评估链接(hr_url)。用于回答'给候选人XX建档'。name 必填; target_line 目标职能线。"""
+    if not name.strip():
+        return {"error": "name required"}
+    rec = _hh_post("/api/candidate/intake",
+                   {"name": name.strip(), "target_line": target_line.strip(),
+                    "notes": notes.strip(), "created_by": created_by.strip()})
+    base = os.environ.get("HEADHUNT_PUBLIC_BASE", "https://www.hiijob.cn").rstrip("/")
+    rec["self_url"] = f"{base}{rec['self_url']}"
+    rec["hr_url"] = f"{base}{rec['hr_url']}"
+    return rec
