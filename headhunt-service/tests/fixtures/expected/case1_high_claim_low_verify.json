@@ -18,6 +18,37 @@
   "source": "internal",
   "confidence": "MEDIUM"
  },
+ "promotion": {
+  "status": "OK",
+  "current_grade": "SC1",
+  "basis": "billing_wan",
+  "window_months": 6,
+  "max_level_jump": 3,
+  "next_grades": [
+   {
+    "grade": "SC2",
+    "annual_wan": 90.0,
+    "quarterly_wan": 22.5,
+    "promotion_line_wan": 67.5,
+    "bd_clients_required": 3
+   },
+   {
+    "grade": "PC1",
+    "annual_wan": 100.0,
+    "quarterly_wan": 25.0,
+    "promotion_line_wan": 75.0,
+    "bd_clients_required": 0
+   },
+   {
+    "grade": "PC2",
+    "annual_wan": 110.0,
+    "quarterly_wan": 27.5,
+    "promotion_line_wan": 82.5,
+    "bd_clients_required": 0
+   }
+  ],
+  "progress": null
+ },
  "breakeven_wan": 39.0,
  "breakeven_monthly": 21000.0,
  "npv_quick_at_target": 96.95,

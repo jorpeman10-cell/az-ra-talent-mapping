@@ -18,6 +18,37 @@
   "source": "interpolated",
   "confidence": "LOW"
  },
+ "promotion": {
+  "status": "OK",
+  "current_grade": "AC2",
+  "basis": "billing_wan",
+  "window_months": 6,
+  "max_level_jump": 3,
+  "next_grades": [
+   {
+    "grade": "C1",
+    "annual_wan": 60.0,
+    "quarterly_wan": 15.0,
+    "promotion_line_wan": 45.0,
+    "bd_clients_required": 0
+   },
+   {
+    "grade": "C2",
+    "annual_wan": 70.0,
+    "quarterly_wan": 17.5,
+    "promotion_line_wan": 52.5,
+    "bd_clients_required": 0
+   },
+   {
+    "grade": "SC1",
+    "annual_wan": 80.0,
+    "quarterly_wan": 20.0,
+    "promotion_line_wan": 60.0,
+    "bd_clients_required": 2
+   }
+  ],
+  "progress": null
+ },
  "breakeven_wan": 31.0,
  "breakeven_monthly": 16000.0,
  "npv_quick_at_target": 45.76,

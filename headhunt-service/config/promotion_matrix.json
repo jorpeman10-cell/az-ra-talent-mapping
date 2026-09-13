@@ -1,0 +1,40 @@
+{
+  "_comment": "晋升矩阵 — 来源: T-STAR 机制设计框架(修订稿3.0) 晋升机制 0414.pptx (2021-11-18)。Steven 2026-09-12 确认: 晋升按开票额(billing); 保留 PC 层; 管理岗个人目标倒挂属正常设计(管理看团队业绩)。",
+  "rules": {
+    "basis": "billing_wan",
+    "window_months": 6,
+    "max_level_jump": 3,
+    "management_exempt_from_jump": true,
+    "system_entry_check_required": true,
+    "year_end_reset": true,
+    "act_special": "ACT 个人目标30万开票/年(季度7.5万); 入职第一个半年完成18万开票可提前升职; 第二年做到30万开票的第二个月升职"
+  },
+  "ic_track": [
+    {"grade": "ACT",  "annual_wan": 30,  "quarterly_wan": 7.5,  "promotion_line_wan": null, "bd_clients_required": 0},
+    {"grade": "AC1",  "annual_wan": 40,  "quarterly_wan": 10,   "promotion_line_wan": 18,   "bd_clients_required": 0},
+    {"grade": "AC2",  "annual_wan": 50,  "quarterly_wan": 12.5, "promotion_line_wan": 37.5, "bd_clients_required": 0},
+    {"grade": "C1",   "annual_wan": 60,  "quarterly_wan": 15,   "promotion_line_wan": 45,   "bd_clients_required": 0},
+    {"grade": "C2",   "annual_wan": 70,  "quarterly_wan": 17.5, "promotion_line_wan": 52.5, "bd_clients_required": 0},
+    {"grade": "SC1",  "annual_wan": 80,  "quarterly_wan": 20,   "promotion_line_wan": 60,   "bd_clients_required": 2},
+    {"grade": "SC2",  "annual_wan": 90,  "quarterly_wan": 22.5, "promotion_line_wan": 67.5, "bd_clients_required": 3},
+    {"grade": "PC1",  "annual_wan": 100, "quarterly_wan": 25,   "promotion_line_wan": 75,   "bd_clients_required": 0},
+    {"grade": "PC2",  "annual_wan": 110, "quarterly_wan": 27.5, "promotion_line_wan": 82.5, "bd_clients_required": 0},
+    {"grade": "ECON", "annual_wan": 120, "quarterly_wan": 30,   "promotion_line_wan": 90,   "bd_clients_required": 0}
+  ],
+  "bd_client_definition": "需签订合同并有推荐成功的 case(case也可以是其他同事关掉的)",
+  "management_track": {
+    "_comment": "管理岗个人目标倒挂属正常: 考核看团队业绩; 密集考核期2个月, 每周复盘制定目标跟踪达成",
+    "levels": [
+      {"grade": "MCON",     "annual_wan": 80, "quarterly_wan": 20},
+      {"grade": "Manager",  "annual_wan": 80, "quarterly_wan": 20},
+      {"grade": "Snr Mgr",  "annual_wan": 80, "quarterly_wan": 20},
+      {"grade": "Director-", "annual_wan": 60, "quarterly_wan": 15}
+    ],
+    "promotions": [
+      {"from": "SC",      "to": "M",     "line_wan": 75,   "conditions": ["招聘或培养一名AC", "考核周期内团队系统录入通过检查", "晋升路演"]},
+      {"from": "M",       "to": "Sr.Mgr", "line_wan": null, "conditions": ["全年团队回款业绩达成", "考核周期内团队系统录入通过检查", "团队中至少招聘或培养一名C1", "晋升路演"]},
+      {"from": "Mgr",     "to": "Sr.Mgr", "line_wan": null, "conditions": ["全年团队回款业绩达成", "考核周期内团队系统录入通过检查", "团队中至少招聘或培养一名SC1", "晋升路演"]},
+      {"from": "Sr.Mgr",  "to": "AD/D",  "line_wan": null, "conditions": ["全年团队回款业绩达成", "考核周期内团队系统录入检查", "团队中至少招聘或培养一名MC", "晋升路演"]}
+    ]
+  }
+}

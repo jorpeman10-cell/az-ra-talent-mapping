@@ -17,6 +17,20 @@ GRADE_TARGETS = (
 )
 GRADE_INDEX = {g[0]: i for i, g in enumerate(GRADE_TARGETS)}
 
+# Mirror of config/promotion_matrix.json ic_track — keep in sync.
+# (grade, promotion_line_wan, bd_clients_required): line attached to the grade
+# you get promoted INTO (6-month billing >= line). ACT is entry level (no line).
+# Per 晋升机制 0414: max 3-level jump, management track exempt, billing (开票) basis.
+PROMOTION_LINES = {
+    "AC1": (18.0, 0), "AC2": (37.5, 0),
+    "C1": (45.0, 0), "C2": (52.5, 0),
+    "SC1": (60.0, 2), "SC2": (67.5, 3),
+    "PC1": (75.0, 0), "PC2": (82.5, 0),
+    "ECON": (90.0, 0),
+}
+PROMOTION_WINDOW_MONTHS = 6
+PROMOTION_MAX_JUMP = 3
+
 # business lines -> domain tag weights (sum per line = 100); used by line_match()
 # and by apply_modifiers() for the domain bonus overlap check.
 LINE_PROFILES = {
@@ -97,6 +111,58 @@ def level_candidate(self_res: dict, hr_res: dict) -> dict:
         "rationale": rationale or ["no modifiers applied"],
         "warnings": [],
     }
+
+
+# ---------- promotion (晋升机制 0414, billing basis) ----------
+
+def promotion_view(current_grade: str, trailing_billing_wan=None, bd_clients: int = 0) -> dict:
+    """Promotion perspective for an IC grade, per config/promotion_matrix.json.
+
+    Rule: 6-month billing >= target grade's promotion line (and BD client count
+    where required) -> promoted, max 3-level jump. Lines are cumulative, so the
+    check stops at the first unmet grade. trailing_billing_wan=None returns path
+    info only (external candidate / no billing data yet).
+    """
+    if current_grade not in GRADE_INDEX:
+        return {"status": "UNKNOWN_GRADE", "current_grade": current_grade}
+    idx = GRADE_INDEX[current_grade]
+    nxt = []
+    for step in range(1, PROMOTION_MAX_JUMP + 1):
+        j = idx + step
+        if j >= len(GRADE_TARGETS):
+            break
+        g, annual, quarterly = GRADE_TARGETS[j]
+        line, bd = PROMOTION_LINES[g]
+        nxt.append({"grade": g, "annual_wan": annual, "quarterly_wan": quarterly,
+                    "promotion_line_wan": line, "bd_clients_required": bd})
+    out = {"status": "OK", "current_grade": current_grade,
+           "basis": "billing_wan", "window_months": PROMOTION_WINDOW_MONTHS,
+           "max_level_jump": PROMOTION_MAX_JUMP, "next_grades": nxt,
+           "progress": None}
+    if trailing_billing_wan is None or not nxt:
+        return out
+    reached = current_grade
+    for entry in nxt:
+        ok_billing = trailing_billing_wan >= entry["promotion_line_wan"]
+        ok_bd = bd_clients >= entry["bd_clients_required"]
+        entry["met"] = ok_billing and ok_bd
+        entry["billing_gap_wan"] = round(max(0.0, entry["promotion_line_wan"] - trailing_billing_wan), 2)
+        entry["bd_gap"] = max(0, entry["bd_clients_required"] - bd_clients)
+        if entry["met"]:
+            reached = entry["grade"]
+        else:
+            break
+    first = nxt[0]
+    out["progress"] = {
+        "trailing_billing_wan": trailing_billing_wan,
+        "bd_clients": bd_clients,
+        "next_grade": first["grade"],
+        "next_line_wan": first["promotion_line_wan"],
+        "progress_pct": round(100.0 * trailing_billing_wan / first["promotion_line_wan"], 1),
+        "eligible_grade": reached,
+        "promotion_ready": reached != current_grade,
+    }
+    return out
 
 
 # ---------- salary / breakeven ----------
@@ -240,13 +306,14 @@ def assess(bundle: dict) -> dict:
     if leveling["status"] != "OK":
         return {"status": leveling["status"], "leveling": leveling, "line_match": lm,
                 "divergence": div, "warnings": warnings}
+    promo = promotion_view(leveling["grade"])  # external candidate: path info only
 
     band = salary_band(leveling["grade"], bundle.get("internal_samples", {}), bundle.get("anchors", {}))
     monthly = band["p50"]
     if monthly is None:
         warnings.append("no internal salary samples — fill config/candidate_grade_map.json "
                         "before salary band is meaningful")
-        return {"status": "OK", "leveling": leveling, "band": band,
+        return {"status": "OK", "leveling": leveling, "band": band, "promotion": promo,
                 "breakeven_wan": None, "breakeven_monthly": None,
                 "npv_quick_at_target": None, "line_match": lm, "divergence": div,
                 "confidence": "LOW", "warnings": warnings}
@@ -255,6 +322,7 @@ def assess(bundle: dict) -> dict:
         "status": "OK",
         "leveling": leveling,
         "band": band,
+        "promotion": promo,
         "breakeven_wan": breakeven_billing(monthly),
         "breakeven_monthly": monthly,
         "npv_quick_at_target": quick_npv(monthly, GRADE_TARGETS[GRADE_INDEX[leveling["grade"]]][1]),
