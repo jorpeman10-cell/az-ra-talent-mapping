@@ -1,4 +1,17 @@
 {
-  "_comment": "HR-maintained advisor->grade mapping for external-candidate salary bands. name must match salary_detail.csv. Fill before P3 live run.",
-  "mapping": {}
+  "_comment": "HR-maintained advisor->grade mapping for external-candidate salary bands. name must match salary_detail.csv. 职级体系来源: 绩效管理政策及薪酬激励政策管理层版2023(微信2026-09) + Benchmark2022/2023 职级薪资档(数据库1). Steven 2026-09-13 复核终版: 曹迎奥=ACT; 胡婷/高一凡=AD, 卞少为=PAR(管理线, 不进 IC 直接样本); 王慧=SC1, 罗海霞=SC2, 王嘉裕=PC1.",
+  "mapping": {
+    "于肖肖": "AC1",
+    "梁旭阳": "AC1",
+    "曹迎奥": "ACT",
+    "魏菲": "AC2",
+    "杨冉芃睿": "AC2",
+    "王慧": "SC1",
+    "白文雪": "C2",
+    "罗海霞": "SC2",
+    "王嘉裕": "PC1",
+    "胡婷": "AD",
+    "高一凡": "AD",
+    "卞少为": "PAR"
+  }
 }
