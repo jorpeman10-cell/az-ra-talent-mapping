@@ -431,7 +431,7 @@ from api.main import app
 client = TestClient(app)
 
 SELF = {"perf_amount": 90, "perf_max_deal": 25, "perf_desc": "某CDMO管线总监单，客户续约二期",
-        "dom_tags": ["肿瘤", "糖尿病/CVRM"], "dom_share": "肿瘤70% 糖尿病30%",
+        "dom_tags": ["医学", "临床运营"], "dom_share": "医学70% 临床运营30%",
         "speed_jc": "1-2天", "speed_case": "接到JC当天出mapping次日首推",
         "stab_moves": "1次", "stab_reason": "原平台团队解散", "comp_share": "按规则分单"}
 HR = {"perf_verify": "有部分佐证，数字合理", "perf_probe": "基本自洽，个别含糊",
@@ -441,7 +441,7 @@ HR = {"perf_verify": "有部分佐证，数字合理", "perf_probe": "基本自�
 
 def test_e2e_full_flow():
     r = client.post("/api/candidate/intake",
-                    json={"name": "e2e测试候选人", "target_line": "肿瘤线", "notes": "e2e"}).json()
+                    json={"name": "e2e测试候选人", "target_line": "医学线", "notes": "e2e"}).json()
     cid, token = r["cid"], r["self_url"].split("/q/")[1]
 
     page = client.get(f"/q/{token}")
@@ -462,7 +462,7 @@ def test_e2e_full_flow():
     out = a.json()
     assert out["status"] == "OK"
     assert out["leveling"]["verify_coefficient"] == 0.9
-    assert out["line_match"]["top_line"] in ("肿瘤线", "糖尿病线")
+    assert out["line_match"]["top_line"] in ("医学线", "临床运营线")
 
     d = client.get(f"/api/candidate/{cid}").json()
     assert d["profile"]["status"] == "ASSESSED"

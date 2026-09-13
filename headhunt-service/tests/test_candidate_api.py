@@ -10,7 +10,7 @@ client = TestClient(app)
 
 SELF_ANSWERS = {
     "perf_amount": 90, "perf_max_deal": 25, "perf_desc": "某CDMO总监单",
-    "dom_tags": ["肿瘤"], "dom_share": "肿瘤100%",
+    "dom_tags": ["医学"], "dom_share": "医学100%",
     "speed_jc": "1-2天", "speed_case": "当天出mapping",
     "stab_moves": "1次", "stab_reason": "平台倒闭",
     "comp_share": "按规则分单",
@@ -25,7 +25,7 @@ HR_ANSWERS = {
 
 
 def test_intake_and_template_flow():
-    r = client.post("/api/candidate/intake", json={"name": "张三", "target_line": "肿瘤线"})
+    r = client.post("/api/candidate/intake", json={"name": "张三", "target_line": "医学线"})
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "CREATED" and body["self_url"].startswith("/q/")

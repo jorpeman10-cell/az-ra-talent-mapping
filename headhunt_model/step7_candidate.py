@@ -33,12 +33,18 @@ PROMOTION_MAX_JUMP = 3
 
 # business lines -> domain tag weights (sum per line = 100); used by line_match()
 # and by apply_modifiers() for the domain bonus overlap check.
+# Function-line taxonomy (bff_function_area_dict level-1). Identity weights:
+# a line is matched by its own tag; BD line absorbs the commercial BD tag.
 LINE_PROFILES = {
-    "肿瘤线": {"肿瘤": 70, "诊断/检验": 30},
-    "糖尿病线": {"糖尿病/CVRM": 70, "综合/不限": 30},
-    "中枢神经线": {"中枢神经": 70, "综合/不限": 30},
-    "器械线": {"器械": 70, "综合/不限": 30},
-    "综合线": {"综合/不限": 40, "肿瘤": 15, "糖尿病/CVRM": 15, "中枢神经": 15, "器械": 15},
+    "医学线": {"医学": 100},
+    "临床运营线": {"临床运营": 100},
+    "BD线": {"BD": 100, "商业BD": 100},
+    "CMC线": {"CMC": 100},
+    "注册线": {"注册": 100},
+    "销售线": {"销售": 100},
+    "市场线": {"市场": 100},
+    "市场准入线": {"市场准入": 100},
+    "综合线": {"综合/不限": 40, "医学": 15, "临床运营": 15, "BD": 10, "CMC": 10, "销售": 10},
 }
 
 

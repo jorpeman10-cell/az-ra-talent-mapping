@@ -10,7 +10,7 @@ def mk(claim, perf_hr, stab_hr=4, speed_hr=4, dom_hr=3, speed_self=4, stab_self=
     self_res = {"dimensions": {"performance": {"score": 5.0}, "domain": {"score": 5.0},
                  "speed": {"score": speed_self}, "stability": {"score": stab_self},
                  "compliance": {"score": 4.0}},
-                "claimed_billing_wan": claim, "domain_tags": ["肿瘤"], "redline": False}
+                "claimed_billing_wan": claim, "domain_tags": ["医学"], "redline": False}
     hr_res = {"dimensions": {"performance": {"score": perf_hr}, "domain": {"score": dom_hr},
                "speed": {"score": speed_hr}, "stability": {"score": stab_hr},
                "compliance": {"score": 4.0}},
@@ -46,7 +46,7 @@ def test_speed_modifier_stacks():
 def test_domain_bonus_half_level():
     # domain>=4 and top line overlap>=60%: +0.5 level rounds up
     s, h = mk(claim=50, perf_hr=5, dom_hr=5)   # AC2 (idx2) +0.5 -> 2.5 -> rounds to 3 (C1)
-    s["domain_tags"] = ["肿瘤", "糖尿病/CVRM"]
+    s["domain_tags"] = ["医学", "临床运营"]
     out = level_candidate(s, h)
     assert out["grade"] == "C1"
 

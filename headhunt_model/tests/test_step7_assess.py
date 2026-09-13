@@ -6,7 +6,7 @@ from step7_candidate import line_match, divergence, assess
 
 def base_bundle(claim=100, perf_hr=4, stab_hr=4, speed_hr=4, dom_hr=3, tags=None, **hr_over):
     # dom_hr defaults to 3: avoids the +0.5 domain bonus unless a test opts in
-    tags = tags or ["肿瘤"]
+    tags = tags or ["医学"]
     self_res = {"dimensions": {"performance": {"score": 5.0}, "domain": {"score": 5.0},
                  "speed": {"score": 4.0}, "stability": {"score": 4.0}, "compliance": {"score": 4.0}},
                 "claimed_billing_wan": claim, "domain_tags": tags, "redline": False}
@@ -20,9 +20,9 @@ def base_bundle(claim=100, perf_hr=4, stab_hr=4, speed_hr=4, dom_hr=3, tags=None
             "anchors": {}}
 
 def test_line_match_ranking():
-    r = line_match(["肿瘤", "糖尿病/CVRM"])
-    assert r["top_line"] == "肿瘤线"
-    assert r["top_overlap_pct"] >= 60
+    r = line_match(["医学", "临床运营"])
+    assert r["top_line"] == "医学线"
+    assert r["top_overlap_pct"] == 100
 
 def test_line_match_empty():
     r = line_match([])

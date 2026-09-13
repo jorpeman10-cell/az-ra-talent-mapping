@@ -1,5 +1,5 @@
 {
-  "self": {"dimensions": {"performance": {"score": 5.0}, "domain": {"score": 5.0}, "speed": {"score": 4.0}, "stability": {"score": 4.0}, "compliance": {"score": 4.0}}, "claimed_billing_wan": 100, "domain_tags": ["肿瘤"], "redline": false},
+  "self": {"dimensions": {"performance": {"score": 5.0}, "domain": {"score": 5.0}, "speed": {"score": 4.0}, "stability": {"score": 4.0}, "compliance": {"score": 4.0}}, "claimed_billing_wan": 100, "domain_tags": ["医学"], "redline": false},
   "hr": {"dimensions": {"performance": {"score": 3.0}, "domain": {"score": 2.0}, "speed": {"score": 2.0}, "stability": {"score": 4.0}, "compliance": {"score": 4.0}}, "claimed_billing_wan": null, "domain_tags": [], "redline": false},
   "internal_samples": {"C1": [15000, 17000], "C2": [18000], "SC1": [20000, 22000]},
   "anchors": {}

@@ -9,7 +9,7 @@ from candidate.store import CANDIDATES_DIR
 
 
 def test_new_candidate_and_get():
-    rec = store.new_candidate("张三", target_line="肿瘤线", notes="内推")
+    rec = store.new_candidate("张三", target_line="医学线", notes="内推")
     assert rec["name"] == "张三" and rec["status"] == "CREATED"
     assert len(rec["token"]) >= 24 and rec["cid"].startswith("c")
     got = store.get(rec["cid"])

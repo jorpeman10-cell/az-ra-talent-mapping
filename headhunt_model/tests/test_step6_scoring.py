@@ -7,7 +7,7 @@ T = default_template()
 
 SELF_FULL = {
     "perf_amount": 80, "perf_max_deal": 25, "perf_desc": "某CDMO管线总监单",
-    "dom_tags": ["肿瘤", "糖尿病/CVRM"], "dom_share": "肿瘤70% 糖尿病30%",
+    "dom_tags": ["医学", "临床运营"], "dom_share": "医学70% 临床运营30%",
     "speed_jc": "1-2天", "speed_case": "接到JC当天出mapping",
     "stab_moves": "1次", "stab_reason": "平台倒闭",
     "comp_share": "按规则分单",
@@ -23,7 +23,7 @@ HR_FULL = {
 def test_self_scores_and_claim():
     r = score_questionnaire(T, SELF_FULL, "self")
     assert r["claimed_billing_wan"] == 80
-    assert r["domain_tags"] == ["肿瘤", "糖尿病/CVRM"]
+    assert r["domain_tags"] == ["医学", "临床运营"]
     assert r["redline"] is False
     assert r["dimensions"]["speed"]["score"] == 4
     assert abs(r["dimensions"]["performance"]["score"] - 5.0) < 1e-9  # no choice in self perf -> neutral 5.0? see rule below

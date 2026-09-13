@@ -40,17 +40,18 @@ _DEFAULT = {
             ],
         },
         {
-            "id": "domain", "name": "领域深耕", "weight": 0.20,
+            "id": "domain", "name": "职能深耕", "weight": 0.20,
             "self_questions": [
-                {"id": "dom_tags", "type": "multi", "label": "主攻领域（多选）",
+                {"id": "dom_tags", "type": "multi", "label": "主攻职能线（多选）",
                  "options": [
-                     {"label": "肿瘤"}, {"label": "糖尿病/CVRM"}, {"label": "中枢神经"},
-                     {"label": "器械"}, {"label": "诊断/检验"}, {"label": "综合/不限"},
+                     {"label": "医学"}, {"label": "临床运营"}, {"label": "BD"}, {"label": "商业BD"},
+                     {"label": "CMC"}, {"label": "注册"}, {"label": "销售"}, {"label": "市场"},
+                     {"label": "市场准入"}, {"label": "综合/不限"},
                  ]},
-                {"id": "dom_share", "type": "text", "label": "各领域成单占比（如：肿瘤70% 糖尿病30%）"},
+                {"id": "dom_share", "type": "text", "label": "各职能线成单占比（如：医学60% 临床运营40%）"},
             ],
             "hr_questions": [
-                {"id": "dom_depth", "type": "choice", "label": "领域知识深度提问打分（靶点/管线/客户组织架构）",
+                {"id": "dom_depth", "type": "choice", "label": "职能领域知识深度提问打分（靶点/管线/客户组织架构）",
                  "options": [
                      {"label": "能讲清管线与组织层级，有独家情报", "score": 5, "redline": False},
                      {"label": "领域知识扎实", "score": 4, "redline": False},

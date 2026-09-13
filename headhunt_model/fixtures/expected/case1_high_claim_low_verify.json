@@ -7,7 +7,7 @@
   "effective_billing_wan": 78.0,
   "verify_coefficient": 0.65,
   "rationale": [
-   "domain depth >=4 with top-line overlap 70.0%: +0.5 level"
+   "domain depth >=4 with top-line overlap 100.0%: +0.5 level"
   ],
   "warnings": []
  },
@@ -55,28 +55,44 @@
  "line_match": {
   "lines": [
    {
-    "line": "肿瘤线",
-    "overlap_pct": 70.0
+    "line": "医学线",
+    "overlap_pct": 100.0
    },
    {
     "line": "综合线",
     "overlap_pct": 15.0
    },
    {
-    "line": "糖尿病线",
+    "line": "临床运营线",
     "overlap_pct": 0.0
    },
    {
-    "line": "中枢神经线",
+    "line": "BD线",
     "overlap_pct": 0.0
    },
    {
-    "line": "器械线",
+    "line": "CMC线",
+    "overlap_pct": 0.0
+   },
+   {
+    "line": "注册线",
+    "overlap_pct": 0.0
+   },
+   {
+    "line": "销售线",
+    "overlap_pct": 0.0
+   },
+   {
+    "line": "市场线",
+    "overlap_pct": 0.0
+   },
+   {
+    "line": "市场准入线",
     "overlap_pct": 0.0
    }
   ],
-  "top_line": "肿瘤线",
-  "top_overlap_pct": 70.0
+  "top_line": "医学线",
+  "top_overlap_pct": 100.0
  },
  "divergence": {
   "divergent": [

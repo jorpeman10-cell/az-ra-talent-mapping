@@ -24,7 +24,7 @@ from api.main import app
 client = TestClient(app)
 
 SELF = {"perf_amount": 90, "perf_max_deal": 25, "perf_desc": "x",
-        "dom_tags": ["肿瘤"], "dom_share": "肿瘤100%", "speed_jc": "1-2天",
+        "dom_tags": ["医学"], "dom_share": "医学100%", "speed_jc": "1-2天",
         "speed_case": "x", "stab_moves": "1次", "stab_reason": "x", "comp_share": "按规则分单"}
 HR = {"perf_verify": "有部分佐证，数字合理", "perf_probe": "基本自洽，个别含糊",
       "dom_depth": "领域知识扎实", "speed_probe": "路径可行",
@@ -49,7 +49,7 @@ def test_assess_happy_path():
     resp = client.post(f"/api/candidate/{cid}/assess")
     assert resp.status_code == 200
     out = resp.json()
-    # 90 * 0.9 = 81 -> SC1 (no modifiers: hr stab/speed 4, dom 4 + overlap 70 -> +0.5 -> int(5.5-1+... ) see P0 case
+    # 90 * 0.9 = 81 -> SC1 base, dom 4 + overlap 100 -> +0.5 -> SC2 (see P0 case)
     assert out["leveling"]["effective_billing_wan"] == 81.0
     assert out["status"] == "OK"
     # internal samples from grade map: C1 = [15000, 17000] -> median p50 16000
