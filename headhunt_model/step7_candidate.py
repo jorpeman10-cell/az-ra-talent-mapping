@@ -287,6 +287,60 @@ def divergence(self_res, hr_res):
     return {"divergent": divergent, "high_divergence": len(divergent) >= 3}
 
 
+# ---------- risk (CV 折减, hunter-calibrated 2026-09-14) ----------
+
+CV_PRIOR = 1.08  # internal median quarterly-billing CV (hunter, n=36 advisors with >=6 quarters)
+CV_CONC_A, CV_CONC_B = 0.65, 2.9  # OLS CV = 0.65 + 2.9x(max_deal/avg_annual); r=0.77, spearman 0.46
+# evidence strengths: 2-point sample and concentration each weak (n=2 / proxy),
+# internal prior anchors (Bayesian shrinkage, same philosophy as the three-layer model)
+CV_SAMPLE_W, CV_CONC_W, CV_PRIOR_W = 2.0, 2.0, 4.0
+
+
+def risk_profile(self_res: dict) -> dict:
+    """Candidate CV estimate: two yearly points (sample) + deal concentration
+    (calibrated OLS), shrunk toward the internal prior. Missing inputs degrade
+    to prior-only (older template versions, minimal scored bundles)."""
+    perf = self_res.get("dimensions", {}).get("performance", {})
+    ans = perf.get("answers", {}) if isinstance(perf, dict) else {}
+    claim = self_res.get("claimed_billing_wan") or 0.0
+    y1, y2 = ans.get("perf_y1"), ans.get("perf_y2")
+    max_deal = ans.get("perf_max_deal")
+
+    cv_sample = None
+    if isinstance(y1, (int, float)) and isinstance(y2, (int, float)) and (y1 + y2) > 0:
+        cv_sample = round(abs(y1 - y2) * (2 ** 0.5) / (y1 + y2), 3)
+
+    avg_annual = (y1 + y2) / 2.0 if cv_sample is not None else claim
+    conc = None
+    if isinstance(max_deal, (int, float)) and avg_annual > 0:
+        conc = round(max_deal / avg_annual, 3)
+    cv_conc = round(CV_CONC_A + CV_CONC_B * conc, 3) if conc is not None else None
+
+    num, den = CV_PRIOR_W * CV_PRIOR, CV_PRIOR_W
+    if cv_sample is not None:
+        num += CV_SAMPLE_W * cv_sample
+        den += CV_SAMPLE_W
+    if cv_conc is not None:
+        num += CV_CONC_W * cv_conc
+        den += CV_CONC_W
+    cv_used = round(num / den, 3)
+
+    return {
+        "cv_prior": CV_PRIOR,
+        "cv_sample": cv_sample,
+        "concentration": conc,
+        "cv_from_concentration": cv_conc,
+        "active_clients": ans.get("active_clients"),
+        "top_client_share_pct": ans.get("top_client_share"),
+        "cv_used": cv_used,
+        "scenario_billing_factor": {
+            "A_conservative": round(max(0.0, 1 - 0.5 * cv_used), 3),
+            "B_base": 1.0,
+            "C_optimistic": round(1 + 0.25 * cv_used, 3),
+        },
+    }
+
+
 # ---------- full assessment ----------
 
 def assess(bundle: dict) -> dict:
@@ -321,21 +375,31 @@ def assess(bundle: dict) -> dict:
                 "divergence": div, "warnings": warnings}
     promo = promotion_view(leveling["grade"])  # external candidate: path info only
 
+    risk = risk_profile(self_res)
+    eff = leveling["effective_billing_wan"] or 0.0
+    risk["scenario_billing_wan"] = {
+        k: round(eff * f, 2) for k, f in risk["scenario_billing_factor"].items()}
+
     band = salary_band(leveling["grade"], bundle.get("internal_samples", {}), bundle.get("anchors", {}))
     monthly = band["p50"]
     if monthly is None:
+        risk["npv_scenarios"] = None
         warnings.append("no internal salary samples — fill config/candidate_grade_map.json "
                         "before salary band is meaningful")
         return {"status": "OK", "leveling": leveling, "band": band, "promotion": promo,
+                "risk": risk,
                 "breakeven_wan": None, "breakeven_monthly": None,
                 "npv_quick_at_target": None, "line_match": lm, "divergence": div,
                 "confidence": "LOW", "warnings": warnings}
     monthly = float(monthly)
+    risk["npv_scenarios"] = {
+        k: quick_npv(monthly, v) for k, v in risk["scenario_billing_wan"].items()}
     return {
         "status": "OK",
         "leveling": leveling,
         "band": band,
         "promotion": promo,
+        "risk": risk,
         "breakeven_wan": breakeven_billing(monthly),
         "breakeven_monthly": monthly,
         "npv_quick_at_target": quick_npv(monthly, GRADE_TARGETS[GRADE_INDEX[leveling["grade"]]][1]),

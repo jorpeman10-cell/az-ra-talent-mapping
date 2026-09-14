@@ -49,6 +49,30 @@
   ],
   "progress": null
  },
+ "risk": {
+  "cv_prior": 1.08,
+  "cv_sample": null,
+  "concentration": null,
+  "cv_from_concentration": null,
+  "active_clients": null,
+  "top_client_share_pct": null,
+  "cv_used": 1.08,
+  "scenario_billing_factor": {
+   "A_conservative": 0.46,
+   "B_base": 1.0,
+   "C_optimistic": 1.27
+  },
+  "scenario_billing_wan": {
+   "A_conservative": 33.12,
+   "B_base": 72.0,
+   "C_optimistic": 91.44
+  },
+  "npv_scenarios": {
+   "A_conservative": -6.61,
+   "B_base": 66.27,
+   "C_optimistic": 96.41
+  }
+ },
  "breakeven_wan": 31.0,
  "breakeven_monthly": 16000.0,
  "npv_quick_at_target": 48.35,

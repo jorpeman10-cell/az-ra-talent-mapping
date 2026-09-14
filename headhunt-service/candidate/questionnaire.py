@@ -11,13 +11,19 @@ DIM_IDS = ("performance", "domain", "speed", "stability", "compliance")
 
 _DEFAULT = {
     "template_id": "consultant_v1",
-    "version": 1,
+    # v2 (2026-09-14): +perf_y1/perf_y2/active_clients/top_client_share —
+    # CV 折减输入(两年拆分 + 客户结构); 数字题不计分, v1 答卷向后兼容.
+    "version": 2,
     "dimensions": [
         {
             "id": "performance", "name": "业绩证据", "weight": 0.35,
             "self_questions": [
                 {"id": "perf_amount", "type": "number", "label": "近两年平均年回款（万）", "unit": "万"},
+                {"id": "perf_y1", "type": "number", "label": "去年年回款（万）", "unit": "万"},
+                {"id": "perf_y2", "type": "number", "label": "前年年回款（万）", "unit": "万"},
                 {"id": "perf_max_deal", "type": "number", "label": "最大单笔成单金额（万）", "unit": "万"},
+                {"id": "active_clients", "type": "number", "label": "近12个月有推荐记录的活跃客户数", "unit": "家"},
+                {"id": "top_client_share", "type": "number", "label": "最大客户回款占年回款比例（%）", "unit": "%"},
                 {"id": "perf_desc", "type": "text", "label": "简述近两年代表性成单（客户/职位/金额）"},
             ],
             "hr_questions": [
