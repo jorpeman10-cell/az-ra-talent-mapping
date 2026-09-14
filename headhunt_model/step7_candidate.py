@@ -176,6 +176,11 @@ def promotion_view(current_grade: str, trailing_billing_wan=None, bd_clients: in
 AFTER_TAX = 0.936            # after-tax coefficient on billing for commission base
 COMMISSION_LADDER = ((40, 0.30), (60, 0.32), (100, 0.35), (150, 0.38), (200, 0.40), (float("inf"), 0.45))
 INTERNAL_ANCHOR_BLEND = 0.6  # 60% internal, 40% market anchor
+# Empirical ramp (hunter DB 2026-09-13, 67 billing-attributed advisors):
+# Y1 ≈ 0.60 of mature level, Y2+ ≈ 1.0; median cost-cover quarter = Q3.
+# Applied to the NPV cashflow, never to the discount rate (risk stays in
+# cashflows, rate stays the uniform cost of capital).
+RAMP_YEAR_FACTORS = (0.60, 1.0, 1.0)
 
 
 def tier(billing_wan: float) -> float:
@@ -205,10 +210,12 @@ def breakeven_billing(monthly: float, insurance_pct: float = 28.0, overhead_wan:
 
 def quick_npv(monthly: float, billing_wan: float, years: int = 3, discount: float = 0.12,
               insurance_pct: float = 28.0, overhead_wan: float = 6.37) -> float:
-    """Flat-billing 3-year NPV feasibility check (wan)."""
+    """Ramp-adjusted 3-year NPV feasibility check (wan). Year factors from
+    RAMP_YEAR_FACTORS (empirical: Y1 0.6x mature, Y2+ 1.0x)."""
     npv = 0.0
     for y in range(1, years + 1):
-        profit = billing_wan - _annual_cost_wan(monthly, billing_wan, insurance_pct, overhead_wan)
+        factor = RAMP_YEAR_FACTORS[y - 1] if y <= len(RAMP_YEAR_FACTORS) else 1.0
+        profit = billing_wan * factor - _annual_cost_wan(monthly, billing_wan * factor, insurance_pct, overhead_wan)
         npv += profit / ((1 + discount) ** y)
     return round(npv, 2)
 
