@@ -1,0 +1,53 @@
+{
+ "advisor_id": "959",
+ "profile": {
+  "mu": 12.04,
+  "cv": 0.592,
+  "beta": 1.0,
+  "alpha": 0.0
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 24.47,
+  "conservative": 14.95,
+  "total_discount": 0.3888,
+  "cv_source": "revenue",
+  "cv_used": 0.592,
+  "itv_qoq": -1.0
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -51.1,
+   "irr": null,
+   "margin_y1": -1.0971,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": -21.85,
+   "irr": 80,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "PASS",
+ "confidence": "MEDIUM",
+ "salary_annual": 18.0,
+ "salary_source": "default_18w",
+ "cost_source": "default_13w_overhead",
+ "pipeline": {
+  "signed_12m_wan": 13.76304,
+  "collection_prob": 0.8,
+  "outlier_cnt": 0,
+  "base_source": "history",
+  "pipeline_base": 11.01
+ },
+ "advisor_name": "孙怡莹",
+ "status": "INACTIVE",
+ "n_quarters": 5,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

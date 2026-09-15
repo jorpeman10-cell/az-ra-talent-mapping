@@ -1,0 +1,18 @@
+C:\Users\EDY\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\paramiko\pkey.py:82: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "cipher": algorithms.TripleDES,
+C:\Users\EDY\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\paramiko\transport.py:253: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "class": algorithms.TripleDES,
+顾问          实际4Q   v1_doc   v2_mu8 v3_mu8cap
+黄铮          15.0      9.4      2.9       2.9
+高一凡         11.8     11.4     13.7       9.5
+王慧          93.6     19.1     32.4      18.5
+胡婷          29.8     90.5     98.2      75.6
+卞少为         98.1      4.0      1.3       1.3
+王嘉裕        117.8     18.6     52.9      37.0
+赵婉玉        146.7    250.1    241.3     184.9
+李彩霞          7.4      1.6      2.2       2.2
+于肖肖         57.4      3.5      4.6       4.6
+
+v1_doc(mu4)        MAPE=83.1%  中位APE=79.6%  n=9
+v2_mu8             MAPE=85.7%  中位APE=70.0%  n=9
+v3_mu8_alphaCap    MAPE=76.6%  中位APE=80.3%  n=9

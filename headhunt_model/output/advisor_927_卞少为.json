@@ -1,0 +1,55 @@
+{
+ "advisor_id": "927",
+ "profile": {
+  "mu": 24.52,
+  "cv": 0.7247,
+  "beta": 0.1593,
+  "alpha": 24.11
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 102.82,
+  "conservative": 56.02,
+  "total_discount": 0.4552,
+  "cv_source": "revenue",
+  "cv_used": 0.7247,
+  "itv_qoq": -0.6863
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -121.6,
+   "irr": null,
+   "margin_y1": -0.6761,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": 8.66,
+   "irr": 0.5929,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "PASS",
+ "confidence": "HIGH",
+ "salary_annual": 55.8,
+ "salary_source": "salary_detail.csv",
+ "cost_source": "xlsx_2026成本拆分(per_head)",
+ "overhead_annual": 6.37,
+ "total_cost_annual_actual": 95.29,
+ "pipeline": {
+  "signed_12m_wan": 247.24,
+  "collection_prob": 0.889,
+  "outlier_cnt": 1,
+  "base_source": "pipeline",
+  "pipeline_base": 219.8
+ },
+ "advisor_name": "卞少为",
+ "status": "ACTIVE",
+ "n_quarters": 15,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

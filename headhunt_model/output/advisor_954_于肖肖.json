@@ -1,0 +1,55 @@
+{
+ "advisor_id": "954",
+ "profile": {
+  "mu": 14.34,
+  "cv": 0.8986,
+  "beta": 1.0,
+  "alpha": 0.0
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 37.05,
+  "conservative": 27.61,
+  "total_discount": 0.2548,
+  "cv_source": "interview",
+  "cv_used": 0.324,
+  "itv_qoq": 1.0
+ },
+ "models": {
+  "employ": {
+   "npv_3y": 19.65,
+   "irr": 9.99,
+   "margin_y1": 0.2876,
+   "feasible": true
+  },
+  "incubate": {
+   "npv_3y": -7.85,
+   "irr": -0.9345,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "EMPLOY",
+ "confidence": "MEDIUM",
+ "salary_annual": 8.52,
+ "salary_source": "salary_detail.csv",
+ "cost_source": "xlsx_2026成本拆分(per_head)",
+ "overhead_annual": 6.37,
+ "total_cost_annual_actual": 19.24,
+ "pipeline": {
+  "signed_12m_wan": 71.6456,
+  "collection_prob": 0.875,
+  "outlier_cnt": 0,
+  "base_source": "pipeline",
+  "pipeline_base": 62.69
+ },
+ "advisor_name": "于肖肖",
+ "status": "ACTIVE",
+ "n_quarters": 9,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

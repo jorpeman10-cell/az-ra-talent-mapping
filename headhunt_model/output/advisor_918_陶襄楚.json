@@ -1,0 +1,46 @@
+{
+ "advisor_id": "918",
+ "profile": {
+  "mu": 19.95,
+  "cv": 0.6168,
+  "beta": 1.0,
+  "alpha": 0.0
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 39.93,
+  "conservative": 23.91,
+  "total_discount": 0.4012,
+  "cv_source": "revenue",
+  "cv_used": 0.6168,
+  "itv_qoq": 0.0
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -25.99,
+   "irr": null,
+   "margin_y1": -0.3109,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": -16.64,
+   "irr": -0.9359,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "PASS",
+ "confidence": "MEDIUM",
+ "salary_annual": 18.0,
+ "salary_source": "default_18w",
+ "cost_source": "default_13w_overhead",
+ "advisor_name": "陶襄楚",
+ "status": "INACTIVE",
+ "n_quarters": 4,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

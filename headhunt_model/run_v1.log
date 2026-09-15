@@ -1,0 +1,26 @@
+C:\Users\EDY\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\paramiko\pkey.py:82: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "cipher": algorithms.TripleDES,
+C:\Users\EDY\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\paramiko\transport.py:253: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "class": algorithms.TripleDES,
+[1/4] 采集数据 (as of 2026-09-02 15:26) ...
+  表A 回款分摊: 477 行 | 表B 客户: 610 行 | 表C 项目明细: 1296 行 | 表E 年度目标: 17 行
+[2/4] 清洗 ...
+  顾问 106 人 (ACTIVE 10), 公司序列 23 个季度
+[3/4] 计算市场阶段 + 顾问决策 ...
+  市场阶段: VOLATILE  slope=-0.3088  cv=0.3094
+  表E 当前年在职目标合计 800万, 实际(YTD) 609万
+[4/4] 输出 ...
+  排名看板 -> C:/Users/EDY/Documents/kimi/workspace/headhunt_model/output/ranking_board_20260902_1526.json
+
+===== 批量排名 (ACTIVE顾问) =====
+排名  姓名             mu     CV   beta     保守产能  决策         score
+1   王嘉裕         29.44 0.1566-0.8211   207.04  EMPLOY    207.04
+2   赵婉玉         36.68 0.2246 0.2149   205.97  EMPLOY    205.97
+3   卞少为         24.52 0.7247 0.1593    93.31  EMPLOY     93.31
+4   王慧           23.4 0.0885 2.5708     71.8  INCUBATE   19.55
+5   罗海霞         25.77 0.2218    1.0     51.1  PASS       10.22
+6   胡婷           7.45 1.0997  0.045    22.01  PASS         4.4
+7   于肖肖         14.34 0.8986    1.0    10.85  PASS        2.17
+8   郝志杰          6.63  0.428    1.0    10.27  PASS        2.05
+9   高一凡          2.95 1.2719  2.182     3.72  PASS        0.34
+10  李彩霞          1.85 1.7321    1.0     0.47  PASS        0.09

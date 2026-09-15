@@ -1,0 +1,53 @@
+{
+ "advisor_id": "942",
+ "profile": {
+  "mu": 26.9,
+  "cv": 1.4428,
+  "beta": 1.0,
+  "alpha": 0.0
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 26.34,
+  "conservative": 10.73,
+  "total_discount": 0.5928,
+  "cv_source": "revenue",
+  "cv_used": 1.4428,
+  "itv_qoq": 0.0
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -62.9,
+   "irr": null,
+   "margin_y1": -1.9204,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": -24.3,
+   "irr": 80,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "PASS",
+ "confidence": "MEDIUM",
+ "salary_annual": 18.0,
+ "salary_source": "default_18w",
+ "cost_source": "default_13w_overhead",
+ "pipeline": {
+  "signed_12m_wan": 0.0,
+  "collection_prob": 0.571,
+  "outlier_cnt": 0,
+  "base_source": "history",
+  "pipeline_base": 0.0
+ },
+ "advisor_name": "刘霄",
+ "status": "INACTIVE",
+ "n_quarters": 5,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

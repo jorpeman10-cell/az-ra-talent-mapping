@@ -1,0 +1,55 @@
+{
+ "advisor_id": "951",
+ "profile": {
+  "mu": 8.55,
+  "cv": 0.4007,
+  "beta": 1.0,
+  "alpha": 0.0
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 19.4,
+  "conservative": 13.71,
+  "total_discount": 0.2932,
+  "cv_source": "revenue",
+  "cv_used": 0.4007,
+  "itv_qoq": 0.8824
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -27.42,
+   "irr": null,
+   "margin_y1": -0.8137,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": -17.73,
+   "irr": 80,
+   "company_rate": 0.2,
+   "feasible": true
+  }
+ },
+ "decision": "INCUBATE",
+ "confidence": "MEDIUM",
+ "salary_annual": 8.52,
+ "salary_source": "salary_detail.csv",
+ "cost_source": "xlsx_2026成本拆分(per_head)",
+ "overhead_annual": 6.37,
+ "total_cost_annual_actual": 14.85,
+ "pipeline": {
+  "signed_12m_wan": 12.0912,
+  "collection_prob": 1.0,
+  "outlier_cnt": 0,
+  "base_source": "history",
+  "pipeline_base": 12.09
+ },
+ "advisor_name": "郝志杰",
+ "status": "ACTIVE",
+ "n_quarters": 5,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

@@ -16,7 +16,7 @@ def _self(answers=None, claim=90.0):
 
 
 def test_template_v2_has_cv_questions_and_validates():
-    assert _DEFAULT["version"] == 2
+    assert _DEFAULT["version"] == 3
     ids = [q["id"] for d in _DEFAULT["dimensions"] for q in d["self_questions"]]
     for qid in ("perf_y1", "perf_y2", "active_clients", "top_client_share"):
         assert qid in ids, qid
@@ -33,7 +33,7 @@ def test_v2_scoring_captures_new_numbers():
     ans = res["dimensions"]["performance"]["answers"]
     assert ans["perf_y1"] == 100 and ans["perf_y2"] == 80
     assert ans["active_clients"] == 6 and ans["top_client_share"] == 40
-    assert res["template_version"] == 2
+    assert res["template_version"] == 3
     # number questions never mark the dimension missing
     assert "missing" not in res["dimensions"]["performance"]
 

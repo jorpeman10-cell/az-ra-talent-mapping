@@ -1,0 +1,53 @@
+{
+ "advisor_id": "920",
+ "profile": {
+  "mu": 20.89,
+  "cv": 1.0931,
+  "beta": 1.0,
+  "alpha": 0.3
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 29.5,
+  "conservative": 12.01,
+  "total_discount": 0.5928,
+  "cv_source": "revenue",
+  "cv_used": 1.0931,
+  "itv_qoq": 0.0
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -61.49,
+   "irr": null,
+   "margin_y1": -1.7893,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": -24.01,
+   "irr": 80,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "PASS",
+ "confidence": "MEDIUM",
+ "salary_annual": 18.0,
+ "salary_source": "default_18w",
+ "cost_source": "default_13w_overhead",
+ "pipeline": {
+  "signed_12m_wan": 0.0,
+  "collection_prob": 1.0,
+  "outlier_cnt": 0,
+  "base_source": "history",
+  "pipeline_base": 0.0
+ },
+ "advisor_name": "邵姗",
+ "status": "INACTIVE",
+ "n_quarters": 6,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

@@ -1,0 +1,46 @@
+{
+ "advisor_id": "872",
+ "profile": {
+  "mu": 8.51,
+  "cv": 0.8168,
+  "beta": 1.0,
+  "alpha": 0.0
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 14.93,
+  "conservative": 7.44,
+  "total_discount": 0.5012,
+  "cv_source": "revenue",
+  "cv_used": 0.8168,
+  "itv_qoq": 0.0
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -72.13,
+   "irr": null,
+   "margin_y1": -3.2135,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": -26.21,
+   "irr": null,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "PASS",
+ "confidence": "MEDIUM",
+ "salary_annual": 18.0,
+ "salary_source": "default_18w",
+ "cost_source": "default_13w_overhead",
+ "advisor_name": "姚苗",
+ "status": "INACTIVE",
+ "n_quarters": 5,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

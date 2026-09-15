@@ -1,0 +1,46 @@
+{
+ "advisor_id": "867",
+ "profile": {
+  "mu": 7.35,
+  "cv": 1.0667,
+  "beta": 1.0,
+  "alpha": 0.0
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 10.62,
+  "conservative": 4.32,
+  "total_discount": 0.5928,
+  "cv_source": "revenue",
+  "cv_used": 1.0667,
+  "itv_qoq": 0.0
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -80.86,
+   "irr": null,
+   "margin_y1": -6.2544,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": -28.03,
+   "irr": null,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "PASS",
+ "confidence": "MEDIUM",
+ "salary_annual": 18.0,
+ "salary_source": "default_18w",
+ "cost_source": "default_13w_overhead",
+ "advisor_name": "陈静",
+ "status": "INACTIVE",
+ "n_quarters": 4,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

@@ -1,6 +1,7 @@
 # Tests for questionnaire scoring: dimension scores, claims, tags, redline, verify coefficient.
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import json
 from step6_questionnaire import default_template, score_questionnaire, verify_coefficient
 
 T = default_template()
@@ -58,3 +59,32 @@ def test_template_version_recorded():
 if __name__ == "__main__":
     for name, fn in sorted(list(globals().items())):
         if name.startswith("test_"): fn(); print(f"{name} PASS")
+
+
+def test_coef_only_question_skipped_in_scores_and_optional():
+    # 2026-09-16 perf_market_env: coef_only questions must not enter the
+    # dimension score (verify coefficient stays pure) and may be unanswered
+    # (old archives) without setting missing.
+    from step6_questionnaire import score_questionnaire
+    t = default_template()
+    t["version"] = 3
+    perf = next(d for d in t["dimensions"] if d["id"] == "performance")
+    perf["hr_questions"].append({
+        "id": "perf_market_env", "type": "choice", "coef_only": True,
+        "label": "该业绩取得时的市场环境",
+        "options": [
+            {"label": "冷门赛道或小平台资源做成", "coef": 1.10},
+            {"label": "正常市场环境", "coef": 1.00},
+            {"label": "热门赛道且大平台资源依赖高", "coef": 0.85},
+        ]})
+    base_answers = {"perf_verify": "有部分佐证，数字合理",
+                    "perf_probe": "基本自洽，个别含糊"}
+    answered = score_questionnaire(t, {**base_answers,
+                                       "perf_market_env": "热门赛道且大平台资源依赖高"}, "hr")
+    unanswered = score_questionnaire(t, base_answers, "hr")
+    perf_a = answered["dimensions"]["performance"]; perf_u = unanswered["dimensions"]["performance"]
+    assert not perf_a.get("missing") and not perf_u.get("missing")
+    assert answered["dimensions"]["performance"]["score"] == \
+           unanswered["dimensions"]["performance"]["score"]
+    assert answered["dimensions"]["performance"]["answers"]["perf_market_env"] == \
+           "热门赛道且大平台资源依赖高"

@@ -1,0 +1,53 @@
+{
+ "advisor_id": "931",
+ "profile": {
+  "mu": 55.98,
+  "cv": 0.6111,
+  "beta": 5.9893,
+  "alpha": 45.82
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 44.78,
+  "conservative": 26.94,
+  "total_discount": 0.3984,
+  "cv_source": "revenue",
+  "cv_used": 0.6111,
+  "itv_qoq": -1.0
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -17.49,
+   "irr": null,
+   "margin_y1": -0.1632,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": -14.88,
+   "irr": -0.9347,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "PASS",
+ "confidence": "HIGH",
+ "salary_annual": 18.0,
+ "salary_source": "default_18w",
+ "cost_source": "default_13w_overhead",
+ "pipeline": {
+  "signed_12m_wan": 47.6928,
+  "collection_prob": 0.815,
+  "outlier_cnt": 0,
+  "base_source": "history",
+  "pipeline_base": 38.87
+ },
+ "advisor_name": "沈铭骋",
+ "status": "INACTIVE",
+ "n_quarters": 12,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

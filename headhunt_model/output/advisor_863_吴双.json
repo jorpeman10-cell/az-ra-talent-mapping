@@ -1,0 +1,53 @@
+{
+ "advisor_id": "863",
+ "profile": {
+  "mu": 12.87,
+  "cv": 0.7542,
+  "beta": 0.9316,
+  "alpha": 12.65
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 23.71,
+  "conservative": 12.57,
+  "total_discount": 0.4699,
+  "cv_source": "revenue",
+  "cv_used": 0.7542,
+  "itv_qoq": 0.0
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -57.74,
+   "irr": null,
+   "margin_y1": -1.4927,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": -23.23,
+   "irr": 80,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "PASS",
+ "confidence": "HIGH",
+ "salary_annual": 18.0,
+ "salary_source": "default_18w",
+ "cost_source": "default_13w_overhead",
+ "pipeline": {
+  "signed_12m_wan": 0.0,
+  "collection_prob": 0.95,
+  "outlier_cnt": 0,
+  "base_source": "history",
+  "pipeline_base": 0.0
+ },
+ "advisor_name": "吴双",
+ "status": "INACTIVE",
+ "n_quarters": 21,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

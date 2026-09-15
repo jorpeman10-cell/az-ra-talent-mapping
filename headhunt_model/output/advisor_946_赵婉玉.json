@@ -1,0 +1,55 @@
+{
+ "advisor_id": "946",
+ "profile": {
+  "mu": 42.1,
+  "cv": 0.2343,
+  "beta": 0.2149,
+  "alpha": 42.21
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 148.13,
+  "conservative": 117.03,
+  "total_discount": 0.21,
+  "cv_source": "revenue",
+  "cv_used": 0.2343,
+  "itv_qoq": 0.7237
+ },
+ "models": {
+  "employ": {
+   "npv_3y": 107.01,
+   "irr": 9.99,
+   "margin_y1": 0.3897,
+   "feasible": true
+  },
+  "incubate": {
+   "npv_3y": 35.35,
+   "irr": 2.4364,
+   "company_rate": 0.2,
+   "feasible": true
+  }
+ },
+ "decision": "EMPLOY",
+ "confidence": "HIGH",
+ "salary_annual": 28.92,
+ "salary_source": "salary_detail.csv",
+ "cost_source": "xlsx_2026成本拆分(per_head)",
+ "overhead_annual": 6.37,
+ "total_cost_annual_actual": 49.91,
+ "pipeline": {
+  "signed_12m_wan": 253.701,
+  "collection_prob": 0.941,
+  "outlier_cnt": 0,
+  "base_source": "pipeline",
+  "pipeline_base": 238.73
+ },
+ "advisor_name": "赵婉玉",
+ "status": "ACTIVE",
+ "n_quarters": 12,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

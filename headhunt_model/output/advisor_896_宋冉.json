@@ -1,0 +1,46 @@
+{
+ "advisor_id": "896",
+ "profile": {
+  "mu": 12.43,
+  "cv": 0.0567,
+  "beta": 1.0,
+  "alpha": 5.71
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 33.49,
+  "conservative": 29.44,
+  "total_discount": 0.1212,
+  "cv_source": "revenue",
+  "cv_used": 0.0567,
+  "itv_qoq": 0.0
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -10.53,
+   "irr": null,
+   "margin_y1": -0.0649,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": -13.43,
+   "irr": -0.934,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "PASS",
+ "confidence": "LOW",
+ "salary_annual": 18.0,
+ "salary_source": "default_18w",
+ "cost_source": "default_13w_overhead",
+ "advisor_name": "宋冉",
+ "status": "INACTIVE",
+ "n_quarters": 2,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

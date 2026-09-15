@@ -18,7 +18,9 @@
  "leveling": {
   "base_grade": "AC2",
   "effective_billing_wan": 55.0,
+  "expected_first_year_wan": 38.5,
   "grade": "AC2",
+  "market_coef": 1.0,
   "rationale": [
    "no modifiers applied"
   ],
@@ -68,7 +70,7 @@
   "top_line": "医学线",
   "top_overlap_pct": 100.0
  },
- "npv_quick_at_target": 19.35,
+ "npv_quick_at_target": 26.51,
  "profit_achievement_wan": 61.0,
  "promotion": {
   "basis": "billing_wan",
@@ -109,9 +111,9 @@
   "cv_sample": null,
   "cv_used": 1.08,
   "npv_scenarios": {
-   "A_conservative": -28.29,
-   "B_base": 29.0,
-   "C_optimistic": 51.81
+   "A_conservative": -8.65,
+   "B_base": 33.63,
+   "C_optimistic": 48.94
   },
   "scenario_billing_factor": {
    "A_conservative": 0.46,

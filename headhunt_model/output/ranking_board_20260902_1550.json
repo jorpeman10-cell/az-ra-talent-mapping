@@ -1,0 +1,87 @@
+{
+ "market_phase": "VOLATILE",
+ "market_slope": -0.3088,
+ "market_cv": 0.3094,
+ "advisors": [
+  {
+   "advisor_id": "933",
+   "name": "王嘉裕",
+   "beta": -0.8211,
+   "conservative": 126.24,
+   "decision": "EMPLOY",
+   "rank_score": 126.24
+  },
+  {
+   "advisor_id": "946",
+   "name": "赵婉玉",
+   "beta": 0.2149,
+   "conservative": 122.14,
+   "decision": "INCUBATE",
+   "rank_score": 85.5
+  },
+  {
+   "advisor_id": "968",
+   "name": "罗海霞",
+   "beta": 1.0,
+   "conservative": 51.1,
+   "decision": "PASS",
+   "rank_score": 10.22
+  },
+  {
+   "advisor_id": "927",
+   "name": "卞少为",
+   "beta": 0.1593,
+   "conservative": 48.9,
+   "decision": "PASS",
+   "rank_score": 9.78
+  },
+  {
+   "advisor_id": "898",
+   "name": "胡婷",
+   "beta": 0.045,
+   "conservative": 25.69,
+   "decision": "PASS",
+   "rank_score": 5.14
+  },
+  {
+   "advisor_id": "951",
+   "name": "郝志杰",
+   "beta": 1.0,
+   "conservative": 13.71,
+   "decision": "PASS",
+   "rank_score": 2.74
+  },
+  {
+   "advisor_id": "954",
+   "name": "于肖肖",
+   "beta": 1.0,
+   "conservative": 10.85,
+   "decision": "PASS",
+   "rank_score": 2.17
+  },
+  {
+   "advisor_id": "851",
+   "name": "王慧",
+   "beta": 2.5708,
+   "conservative": 10.96,
+   "decision": "PASS",
+   "rank_score": 0.85
+  },
+  {
+   "advisor_id": "952",
+   "name": "李彩霞",
+   "beta": 1.0,
+   "conservative": 0.82,
+   "decision": "PASS",
+   "rank_score": 0.16
+  },
+  {
+   "advisor_id": "845",
+   "name": "高一凡",
+   "beta": 2.182,
+   "conservative": 0.0,
+   "decision": "PASS",
+   "rank_score": 0.0
+  }
+ ]
+}

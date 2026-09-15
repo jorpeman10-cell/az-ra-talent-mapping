@@ -1,0 +1,46 @@
+{
+ "advisor_id": "843",
+ "profile": {
+  "mu": 0.0,
+  "cv": 1.0,
+  "beta": 1.0,
+  "alpha": 0.0
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 0.0,
+  "conservative": 0.0,
+  "total_discount": 0.5928,
+  "cv_source": "revenue",
+  "cv_used": 1.0,
+  "itv_qoq": 0.0
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -92.96,
+   "irr": null,
+   "margin_y1": null,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": -30.54,
+   "irr": null,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "PASS",
+ "confidence": "LOW",
+ "salary_annual": 18.0,
+ "salary_source": "default_18w",
+ "cost_source": "default_13w_overhead",
+ "advisor_name": "李珍",
+ "status": "INACTIVE",
+ "n_quarters": 1,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

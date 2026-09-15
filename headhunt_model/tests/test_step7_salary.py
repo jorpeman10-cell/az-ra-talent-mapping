@@ -73,7 +73,7 @@ if __name__ == "__main__":
 # profit-achievement (commission fully covers salary: (X/1.06)*tier = salary*12).
 from step7_candidate import (
     VAT_RATE, INSURANCE_PCT, OVERHEAD_WAN, net_billing, commission_cash,
-    profit_achievement_billing,
+    profit_achievement_billing, _annual_cost_wan,
 )
 
 def test_model_constants_steven_ruling():
@@ -117,3 +117,49 @@ def test_band_blends_when_3plus_internal_samples():
     assert band["source"] == "blend"
     # 0.6*internal + 0.4*anchor on every percentile
     assert band["p50"] == round(0.6 * 16000 + 0.4 * 12000)
+
+
+# ---------- 2026-09-16 market-difficulty + platform-transition (Steven) ----------
+from step7_candidate import MARKET_ENV_COEF, PLATFORM_TRANSITION_FACTOR, level_candidate
+
+def test_market_env_constants():
+    assert MARKET_ENV_COEF["冷门赛道或小平台资源做成"] == 1.10
+    assert MARKET_ENV_COEF["正常市场环境"] == 1.00
+    assert MARKET_ENV_COEF["热门赛道且大平台资源依赖高"] == 0.85
+    assert 0.5 < PLATFORM_TRANSITION_FACTOR < 0.9
+
+def test_leveling_applies_market_and_transition():
+    self_res = {"claimed_billing_wan": 100.0, "domain_tags": ["医学"],
+                "domain_share": "医学100%", "redline": False}
+    dims = {d: {"score": 4, "answers": {}} for d in
+            ("performance", "domain", "speed", "stability", "compliance")}
+    dims["performance"]["answers"]["perf_market_env"] = "热门赛道且大平台资源依赖高"
+    hr_res = {"redline": False, "dimensions": dims}
+    out = level_candidate(self_res, hr_res)
+    assert out["verify_coefficient"] == 0.9
+    assert out["effective_billing_wan"] == 90.0
+    assert out["market_coef"] == 0.85
+    # expected first-year = 90 x 0.85 x 0.70 = 53.55
+    assert out["expected_first_year_wan"] == 53.55
+
+def test_leveling_market_env_defaults_neutral_when_unanswered():
+    # Old questionnaires (pre-template-v3) have no perf_market_env answer —
+    # neutral 1.0, still expected-first-year applies the transition factor.
+    self_res = {"claimed_billing_wan": 100.0, "domain_tags": ["医学"],
+                "domain_share": "医学100%", "redline": False}
+    dims = {d: {"score": 4, "answers": {}} for d in
+            ("performance", "domain", "speed", "stability", "compliance")}
+    hr_res = {"redline": False, "dimensions": dims}
+    out = level_candidate(self_res, hr_res)
+    assert out["market_coef"] == 1.0
+    assert out["expected_first_year_wan"] == 63.0  # 90 x 1.0 x 0.7
+
+def test_quick_npv_first_year_override():
+    # Y1 uses the explicit first-year billing (market+transition adjusted);
+    # Y2+ use the mature billing.
+    npv = quick_npv(14000.0, 90.0, first_year_wan=53.55)
+    manual = 0.0
+    for y, billing in ((1, 53.55), (2, 90.0), (3, 90.0)):
+        profit = net_billing(billing) - _annual_cost_wan(14000.0, billing)
+        manual += profit / (1.12 ** y)
+    assert abs(npv - round(manual, 2)) < 0.05

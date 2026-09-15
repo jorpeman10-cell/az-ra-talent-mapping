@@ -22,7 +22,7 @@ CONTRACT_SCHEMA_VERSION = "candidate_assessment_headhunt_contract_v1"
 # Updated only after the independently tracked Federation artifact is canonicalized.
 # Frozen contract digest — intentionally updated 2026-09-14: questionnaire
 # template v2 (CV questions) bumps the embedded template_version 1 -> 2.
-CONTRACT_SHA256 = "68f115e2f4d428836b92e8071bd00b000b84f157d8e53c3e8606f4b6c9170505"
+CONTRACT_SHA256 = "25fadce2052d5a3069f740758635a7846c4407edbcce37131fff5c991cb2431c"
 
 
 def _canonical_json(value: object) -> bytes:

@@ -106,6 +106,12 @@ def level_candidate(self_res: dict, hr_res: dict) -> dict:
     claim = self_res.get("claimed_billing_wan") or 0.0
     coef = VERIFY_COEF[min(5, max(1, int(hr_res["dimensions"]["performance"]["score"])))]
     effective = round(claim * coef, 2)
+    market_answer = (
+        hr_res.get("dimensions", {}).get("performance", {})
+        .get("answers", {}).get("perf_market_env")
+    )
+    market_coef = MARKET_ENV_COEF.get(str(market_answer or ""), 1.0)
+    expected_first_year = round(effective * market_coef * PLATFORM_TRANSITION_FACTOR, 2)
     base_idx = resolve_base_grade(effective)
     final_idx, rationale = apply_modifiers(base_idx, self_res, hr_res)
     return {
@@ -113,6 +119,8 @@ def level_candidate(self_res: dict, hr_res: dict) -> dict:
         "grade": GRADE_TARGETS[final_idx][0],
         "base_grade": GRADE_TARGETS[base_idx][0],
         "effective_billing_wan": effective,
+        "market_coef": market_coef,
+        "expected_first_year_wan": expected_first_year,
         "verify_coefficient": coef,
         "rationale": rationale or ["no modifiers applied"],
         "warnings": [],
@@ -183,6 +191,17 @@ def promotion_view(current_grade: str, trailing_billing_wan=None, bd_clients: in
 # ledger, untouched).
 
 VAT_RATE = 0.06              # VAT on billing: net = X / 1.06
+# 2026-09-16 Steven: past-performance translation. 有效回款 (claim x verify)
+# measures DEMONSTRATED capability and stays the leveling base; the
+# expected-first-year line applies the market-difficulty coefficient
+# (HR judgement, perf_market_env) and the platform-transition factor
+# (historical billing != our-platform billing, Y1).
+MARKET_ENV_COEF = {
+    "冷门赛道或小平台资源做成": 1.10,
+    "正常市场环境": 1.00,
+    "热门赛道且大平台资源依赖高": 0.85,
+}
+PLATFORM_TRANSITION_FACTOR = 0.70
 INSURANCE_PCT = 34.0         # employer social insurance + housing fund (Shanghai, on salary)
 OVERHEAD_WAN = 6.37          # per-head annual overhead (Steven 2026-09-16 confirmed)
 COMMISSION_LADDER = ((40, 0.30), (60, 0.32), (100, 0.35), (150, 0.38), (200, 0.40), (float("inf"), 0.45))
@@ -244,14 +263,21 @@ def profit_achievement_billing(monthly: float) -> float:
 
 
 def quick_npv(monthly: float, billing_wan: float, years: int = 3, discount: float = 0.12,
-              insurance_pct: float = INSURANCE_PCT, overhead_wan: float = OVERHEAD_WAN) -> float:
+              insurance_pct: float = INSURANCE_PCT, overhead_wan: float = OVERHEAD_WAN,
+              first_year_wan: float | None = None) -> float:
     """Ramp-adjusted 3-year NPV feasibility check (wan, VAT-exclusive net
-    revenue). Year factors from RAMP_YEAR_FACTORS (empirical: Y1 0.6x mature,
-    Y2+ 1.0x)."""
+    revenue). Y1 billing defaults to billing_wan x RAMP_YEAR_FACTORS[0];
+    pass first_year_wan to use the market+transition adjusted expectation
+    (2026-09-16: effective x market_coef x PLATFORM_TRANSITION_FACTOR).
+    Y2+ run at the mature billing."""
     npv = 0.0
     for y in range(1, years + 1):
         factor = RAMP_YEAR_FACTORS[y - 1] if y <= len(RAMP_YEAR_FACTORS) else 1.0
-        profit = net_billing(billing_wan * factor) - _annual_cost_wan(monthly, billing_wan * factor, insurance_pct, overhead_wan)
+        year_billing = (
+            first_year_wan if (y == 1 and first_year_wan is not None)
+            else billing_wan * factor
+        )
+        profit = net_billing(year_billing) - _annual_cost_wan(monthly, year_billing, insurance_pct, overhead_wan)
         npv += profit / ((1 + discount) ** y)
     return round(npv, 2)
 
@@ -435,8 +461,12 @@ def assess(bundle: dict) -> dict:
                 "npv_quick_at_target": None, "line_match": lm, "divergence": div,
                 "confidence": "LOW", "warnings": warnings}
     monthly = float(monthly)
+    # 2026-09-16: Y1 uses the market+transition adjusted expectation
+    # (effective x market_coef x PLATFORM_TRANSITION_FACTOR); Y2+ mature.
+    first_year = leveling.get("expected_first_year_wan")
     risk["npv_scenarios"] = {
-        k: quick_npv(monthly, v) for k, v in risk["scenario_billing_wan"].items()}
+        k: quick_npv(monthly, v, first_year_wan=(first_year if first_year else None))
+        for k, v in risk["scenario_billing_wan"].items()}
     return {
         "status": "OK",
         "leveling": leveling,
@@ -446,7 +476,9 @@ def assess(bundle: dict) -> dict:
         "breakeven_wan": breakeven_billing(monthly),
         "profit_achievement_wan": profit_achievement_billing(monthly),
         "breakeven_monthly": monthly,
-        "npv_quick_at_target": quick_npv(monthly, GRADE_TARGETS[GRADE_INDEX[leveling["grade"]]][1]),
+        "npv_quick_at_target": quick_npv(
+            monthly, GRADE_TARGETS[GRADE_INDEX[leveling["grade"]]][1],
+            first_year_wan=(first_year if first_year else None)),
         "line_match": lm,
         "divergence": div,
         "confidence": band["confidence"],

@@ -1,0 +1,55 @@
+{
+ "advisor_id": "898",
+ "profile": {
+  "mu": 12.59,
+  "cv": 0.7683,
+  "beta": 0.045,
+  "alpha": 12.55
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 24.01,
+  "conservative": 13.46,
+  "total_discount": 0.4395,
+  "cv_source": "interview",
+  "cv_used": 0.6934,
+  "itv_qoq": -0.2
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -136.68,
+   "irr": null,
+   "margin_y1": -5.7296,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": -19.28,
+   "irr": null,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "PASS",
+ "confidence": "HIGH",
+ "salary_annual": 30.12,
+ "salary_source": "salary_detail.csv",
+ "cost_source": "xlsx_2026成本拆分(per_head)",
+ "overhead_annual": 6.37,
+ "total_cost_annual_actual": 39.49,
+ "pipeline": {
+  "signed_12m_wan": 16.8,
+  "collection_prob": 1.0,
+  "outlier_cnt": 0,
+  "base_source": "history",
+  "pipeline_base": 16.8
+ },
+ "advisor_name": "胡婷",
+ "status": "ACTIVE",
+ "n_quarters": 19,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

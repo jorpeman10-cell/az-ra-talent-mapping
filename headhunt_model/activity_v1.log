@@ -1,0 +1,30 @@
+C:\Users\EDY\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\paramiko\pkey.py:82: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "cipher": algorithms.TripleDES,
+C:\Users\EDY\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\paramiko\transport.py:253: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "class": algorithms.TripleDES,
+=== 领先-滞后相关 (汇集全部有回款史的顾问) ===
+活动指标       k=0(当季)    k=+1    k=+2    k=+3    k=+4
+推荐         0.101   0.091   0.061   0.051   0.046
+面试         0.281   0.344   0.393   0.331   0.256
+
+=== 顾问级: 活动 vs 业绩 (ACTIVE, 近8季度) ===
+姓名          推荐/季    面试/季   活动CV    回款mu   回款CV       推荐→次季回款r      面试→次季回款r
+郭建飞          0.5     0.5   0.71    46.6   1.04          n/a           n/a
+黄铮           0.5     0.4   1.56     5.5   1.85        -0.35         -0.35
+高一凡          6.8     0.2   1.48     4.0   0.92        -0.47         -0.39
+王慧         683.8    44.1   0.17    18.0   0.51         0.56          0.20
+李文婷          0.0     0.0   1.00     8.0   1.04          n/a           n/a
+胡婷          57.0    14.0   0.77    12.6   0.79        -0.27          0.24
+卞少为          8.1     9.0   1.57    14.3   1.15         0.18          0.21
+王嘉裕         53.9    35.8   0.29    19.2   0.70        -0.85         -0.32
+赵婉玉         91.6    41.9   0.23    42.1   0.36         0.09          0.53
+郝志杰        172.2    16.5   0.34     8.5   0.54          n/a           n/a
+李彩霞        334.4     0.4   2.55     2.2   1.76        -0.26          0.50
+于肖肖        105.4    20.6   0.63    10.0   1.09        -0.33         -0.71
+慕佳俊         82.0    13.8   0.20    15.1   0.83          n/a           n/a
+罗海霞         13.9     8.1   0.44    25.8   0.22          n/a           n/a
+
+=== 横截面相关 (n=14) ===
+活动CV vs 回款CV: r=0.818  (活动越稳的人回款越稳?)
+活动量 vs 回款mu: r=-0.082  (活动越多的人产能越高?)
+  其中 推荐量 vs mu: r=-0.115   面试量 vs mu: r=0.343

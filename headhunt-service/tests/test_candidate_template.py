@@ -17,7 +17,7 @@ client = TestClient(app)
 
 def test_get_seeds_default():
     t = client.get("/api/template").json()
-    assert t["template_id"] == "consultant_v1" and t["version"] == 2  # v2: CV questions
+    assert t["template_id"] == "consultant_v1" and t["version"] == 3  # v3: + perf_market_env coef_only (market difficulty)
     assert len(t["dimensions"]) == 5
 
 
@@ -47,12 +47,12 @@ def test_put_valid_bumps_version_and_archives():
     t = client.get("/api/template").json()
     t["dimensions"][0]["name"] = "业绩证据（修订）"
     r = client.put("/api/template", json=t)
-    assert r.status_code == 200 and r.json()["version"] == 3
+    assert r.status_code == 200 and r.json()["version"] == 4  # v3 seeded -> PUT bumps to 4
     t2 = client.get("/api/template").json()
-    assert t2["version"] == 3 and t2["dimensions"][0]["name"] == "业绩证据（修订）"
-    hist = os.path.join(TMP, "templates", "v2.json")
+    assert t2["version"] == 4 and t2["dimensions"][0]["name"] == "业绩证据（修订）"
+    hist = os.path.join(TMP, "templates", "v3.json")
     assert os.path.isfile(hist)
-    assert json.load(open(hist, encoding="utf-8"))["version"] == 2
+    assert json.load(open(hist, encoding="utf-8"))["version"] == 3
 
 
 def test_editor_page_served():

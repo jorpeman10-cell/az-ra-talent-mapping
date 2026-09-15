@@ -1,0 +1,53 @@
+{
+ "advisor_id": "837",
+ "profile": {
+  "mu": 17.93,
+  "cv": 0.4575,
+  "beta": 3.9152,
+  "alpha": 11.87
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 14.34,
+  "conservative": 9.73,
+  "total_discount": 0.3216,
+  "cv_source": "revenue",
+  "cv_used": 0.4575,
+  "itv_qoq": 0.0
+ },
+ "models": {
+  "employ": {
+   "npv_3y": -75.62,
+   "irr": null,
+   "margin_y1": -4.0625,
+   "feasible": false
+  },
+  "incubate": {
+   "npv_3y": -26.94,
+   "irr": null,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "PASS",
+ "confidence": "HIGH",
+ "salary_annual": 18.0,
+ "salary_source": "default_18w",
+ "cost_source": "default_13w_overhead",
+ "pipeline": {
+  "signed_12m_wan": 0.0,
+  "collection_prob": 1.0,
+  "outlier_cnt": 0,
+  "base_source": "history",
+  "pipeline_base": 0.0
+ },
+ "advisor_name": "王天琪",
+ "status": "INACTIVE",
+ "n_quarters": 16,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

@@ -1,0 +1,46 @@
+{
+ "advisor_id": "861",
+ "profile": {
+  "mu": 27.8,
+  "cv": 0.4214,
+  "beta": 1.0,
+  "alpha": 0.0
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 62.36,
+  "conservative": 43.43,
+  "total_discount": 0.3035,
+  "cv_source": "revenue",
+  "cv_used": 0.4214,
+  "itv_qoq": 0.0
+ },
+ "models": {
+  "employ": {
+   "npv_3y": 28.69,
+   "irr": 9.99,
+   "margin_y1": 0.2783,
+   "feasible": true
+  },
+  "incubate": {
+   "npv_3y": -5.29,
+   "irr": -0.0662,
+   "company_rate": 0.2,
+   "feasible": false
+  }
+ },
+ "decision": "EMPLOY",
+ "confidence": "MEDIUM",
+ "salary_annual": 18.0,
+ "salary_source": "default_18w",
+ "cost_source": "default_13w_overhead",
+ "advisor_name": "张文昊",
+ "status": "INACTIVE",
+ "n_quarters": 5,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

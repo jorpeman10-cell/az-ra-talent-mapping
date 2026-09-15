@@ -16,7 +16,9 @@
  "leveling": {
   "base_grade": "C1",
   "effective_billing_wan": 60.0,
+  "expected_first_year_wan": 42.0,
   "grade": "C1",
+  "market_coef": 1.0,
   "rationale": [
    "no modifiers applied"
   ],
@@ -66,7 +68,7 @@
   "top_line": "市场准入线",
   "top_overlap_pct": 100.0
  },
- "npv_quick_at_target": 38.64,
+ "npv_quick_at_target": 43.7,
  "profit_achievement_wan": 61.0,
  "promotion": {
   "basis": "billing_wan",
@@ -107,9 +109,9 @@
   "cv_sample": null,
   "cv_used": 1.08,
   "npv_scenarios": {
-   "A_conservative": -23.85,
-   "B_base": 38.64,
-   "C_optimistic": 60.9
+   "A_conservative": -2.43,
+   "B_base": 43.7,
+   "C_optimistic": 57.76
   },
   "scenario_billing_factor": {
    "A_conservative": 0.46,

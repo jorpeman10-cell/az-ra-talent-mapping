@@ -1,0 +1,55 @@
+{
+ "advisor_id": "851",
+ "profile": {
+  "mu": 23.4,
+  "cv": 0.0885,
+  "beta": 2.5708,
+  "alpha": 20.85
+ },
+ "market_phase": {
+  "phase": "VOLATILE",
+  "market_slope": -0.3088,
+  "market_cv": 0.3094,
+  "window_quarters": 8
+ },
+ "capacity": {
+  "effective_base": 60.71,
+  "conservative": 52.39,
+  "total_discount": 0.1371,
+  "cv_source": "revenue",
+  "cv_used": 0.0885,
+  "itv_qoq": -0.3913
+ },
+ "models": {
+  "employ": {
+   "npv_3y": 55.32,
+   "irr": 9.99,
+   "margin_y1": 0.3772,
+   "feasible": true
+  },
+  "incubate": {
+   "npv_3y": 6.55,
+   "irr": 0.4749,
+   "company_rate": 0.2,
+   "feasible": true
+  }
+ },
+ "decision": "EMPLOY",
+ "confidence": "HIGH",
+ "salary_annual": 13.32,
+ "salary_source": "salary_detail.csv",
+ "cost_source": "xlsx_2026成本拆分(per_head)",
+ "overhead_annual": 6.37,
+ "total_cost_annual_actual": 27.67,
+ "pipeline": {
+  "signed_12m_wan": 62.2484,
+  "collection_prob": 1.0,
+  "outlier_cnt": 0,
+  "base_source": "history",
+  "pipeline_base": 62.25
+ },
+ "advisor_name": "王慧",
+ "status": "ACTIVE",
+ "n_quarters": 22,
+ "timestamp": "2026-09-03T05:51:58.939227"
+}

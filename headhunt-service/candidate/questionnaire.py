@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# Synced from headhunt_model/step6_questionnaire.py @ P0 (main c4cf532). Service-side fixes go here; port back to keep both green.
 """step6: questionnaire template model, default template, validation, versioning.
 Pure functions + JSON-friendly dicts. No LLM, no network, no production data.
 """
@@ -13,7 +12,7 @@ _DEFAULT = {
     "template_id": "consultant_v1",
     # v2 (2026-09-14): +perf_y1/perf_y2/active_clients/top_client_share —
     # CV 折减输入(两年拆分 + 客户结构); 数字题不计分, v1 答卷向后兼容.
-    "version": 2,
+    "version": 3,
     "dimensions": [
         {
             "id": "performance", "name": "业绩证据", "weight": 0.35,
@@ -42,6 +41,17 @@ _DEFAULT = {
                      {"label": "多处含糊", "score": 3, "redline": False},
                      {"label": "关键细节答不上", "score": 2, "redline": False},
                      {"label": "回避追问", "score": 1, "redline": False},
+                 ]},
+                # 2026-09-16 Steven: market difficulty input. coef_only — the
+                # answer feeds a market coefficient in step7, never the
+                # verification score; optional so pre-v3 archives keep
+                # assessing (neutral 1.0).
+                {"id": "perf_market_env", "type": "choice", "coef_only": True,
+                 "label": "该业绩取得时的市场环境",
+                 "options": [
+                     {"label": "冷门赛道或小平台资源做成"},
+                     {"label": "正常市场环境"},
+                     {"label": "热门赛道且大平台资源依赖高"},
                  ]},
             ],
         },
@@ -175,7 +185,7 @@ def validate_template(t: dict) -> list:
                 if not opts:
                     errors.append(f"choice question needs options: {q.get('id')}")
                 for o in opts:
-                    if not isinstance(o.get("score"), (int, float)):
+                    if not isinstance(o.get("score"), (int, float)) and not q.get("coef_only"):
                         errors.append(f"option missing score: {q.get('id')}")
             else:
                 for o in q.get("options") or []:
@@ -228,6 +238,10 @@ def score_questionnaire(t: dict, responses: dict, role: str) -> dict:
             ans = responses.get(q["id"])
             answers[q["id"]] = ans
             if q["type"] == "choice":
+                if q.get("coef_only"):
+                    # coef-only questions feed step7 coefficients, not scores;
+                    # unanswered is allowed (older archives).
+                    continue
                 if ans is None:
                     missing = True
                     continue
