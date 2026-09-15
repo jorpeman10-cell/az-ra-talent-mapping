@@ -234,6 +234,16 @@ class IntakeIn(BaseModel):
     target_line: str = ""
     notes: str = ""
     created_by: str = ""
+    # 2026-09-16 dedup + resume fields (2026-09-15 design). phone/email are
+    # dedup keys extracted from the resume (or dictated); hunter_resume_id is
+    # the confirmed binding from the gateway confirmation card.
+    phone: str = ""
+    email: str = ""
+    hunter_resume_id: int | None = None
+    resume_text: str = ""
+    resume_source: str = "none"  # attachment | hunter | none
+    dedup_skipped: bool = False
+    dedup_unavailable: bool = False
 
 
 class SubmitIn(BaseModel):
@@ -329,8 +339,13 @@ def _token_http_error(reason):
 def api_candidate_intake(body: IntakeIn):
     if not body.name.strip():
         raise HTTPException(422, "name required")
-    rec = new_candidate(body.name.strip(), body.target_line, body.notes,
-                        created_by=body.created_by.strip())
+    rec = new_candidate(
+        body.name.strip(), body.target_line, body.notes,
+        created_by=body.created_by.strip(),
+        phone=body.phone.strip(), email=body.email.strip(),
+        hunter_resume_id=body.hunter_resume_id,
+        resume_text=body.resume_text, resume_source=body.resume_source,
+        dedup_skipped=body.dedup_skipped, dedup_unavailable=body.dedup_unavailable)
     return {"cid": rec["cid"], "name": rec["name"], "status": rec["status"],
             "self_url": f"/q/{rec['token']}", "expires_at": rec["token_expires_at"],
             "hr_url": f"/h/{rec['hr_token']}"}

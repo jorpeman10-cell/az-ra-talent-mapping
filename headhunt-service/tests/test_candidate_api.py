@@ -91,3 +91,45 @@ if __name__ == "__main__":
     for n, f in sorted(list(globals().items())):
         if n.startswith("test_"):
             f(); print(n, "PASS")
+
+
+# ---------- 2026-09-16 intake dedup + resume fields (design: docs/superpowers/
+# specs/2026-09-15-intake-dedup-resume-design.md) ----------
+
+def test_intake_accepts_dedup_and_resume_fields():
+    r = client.post("/api/candidate/intake", json={
+        "name": "李彩霞", "target_line": "",
+        "phone": "15827115297", "email": "licaixia926@163.com",
+        "hunter_resume_id": 763609,
+        "resume_text": "李彩霞 Carrie 泰伦仕 …",
+        "resume_source": "attachment",
+    })
+    assert r.status_code == 200
+    cid = r.json()["cid"]
+    profile = client.get(f"/api/candidate/{cid}").json()["profile"]
+    assert profile["hunter_resume_id"] == 763609
+    assert profile["phone"] == "15827115297"
+    assert profile["email"] == "licaixia926@163.com"
+    assert profile["resume_source"] == "attachment"
+    assert "Carrie" in profile["resume_text"]
+
+def test_intake_dedup_flags_default_off():
+    r = client.post("/api/candidate/intake", json={"name": "王五"})
+    assert r.status_code == 200
+    profile = client.get(f"/api/candidate/{r.json()['cid']}").json()["profile"]
+    assert profile["hunter_resume_id"] is None
+    assert profile["dedup_skipped"] is False
+    assert profile["dedup_unavailable"] is False
+    assert profile["resume_source"] == "none"
+
+def test_intake_dedup_skip_and_unavailable_flags():
+    r = client.post("/api/candidate/intake", json={
+        "name": "赵六", "dedup_skipped": True, "dedup_unavailable": False})
+    profile = client.get(f"/api/candidate/{r.json()['cid']}").json()["profile"]
+    assert profile["dedup_skipped"] is True
+
+def test_intake_resume_text_truncated_to_80kb():
+    r = client.post("/api/candidate/intake", json={
+        "name": "钱七", "resume_text": "x" * 200_000})
+    profile = client.get(f"/api/candidate/{r.json()['cid']}").json()["profile"]
+    assert len(profile["resume_text"]) <= 80_000

@@ -30,11 +30,25 @@ def _write(cid, fname, obj):
         json.dump(obj, f, ensure_ascii=False, indent=1)
 
 
-def new_candidate(name, target_line="", notes="", created_by=""):
+RESUME_TEXT_MAX = 80_000  # bytes-ish cap for the assessment-side resume copy
+
+
+def new_candidate(name, target_line="", notes="", created_by="",
+                  phone="", email="", hunter_resume_id=None,
+                  resume_text="", resume_source="none",
+                  dedup_skipped=False, dedup_unavailable=False):
     cid = _cid()
     rec = {
         "cid": cid, "name": name, "target_line": target_line or "", "notes": notes or "",
         "created_by": created_by or "",
+        # 2026-09-16 intake dedup + resume fields (design: 2026-09-15 spec).
+        # Binding/audit fields persist; the resume copy is capped at 80KB.
+        "phone": phone or "", "email": email or "",
+        "hunter_resume_id": hunter_resume_id,
+        "hunter_matched_at": _now().isoformat() if hunter_resume_id else None,
+        "dedup_skipped": bool(dedup_skipped), "dedup_unavailable": bool(dedup_unavailable),
+        "resume_text": (resume_text or "")[:RESUME_TEXT_MAX],
+        "resume_source": resume_source or "none",
         "created_at": _now().isoformat(),
         "token": secrets.token_urlsafe(24),
         "token_expires_at": (_now() + timedelta(hours=TOKEN_TTL_HOURS)).isoformat(),
