@@ -54,6 +54,17 @@ def test_hr_page_always_served():
     assert client.get("/h/nope").status_code == 200      # page even for bad token
 
 
+def test_hr_page_defines_goagent_for_the_report_button():
+    # The post-submit success block renders an inline onclick="goAgent(...)"
+    # button — the handler must exist in the page or the click is a silent
+    # ReferenceError (2026-09-15 production: 返回Agent 点击无效).
+    body = _intake()
+    page = client.get(body["hr_url"]).text
+    assert "goAgent(" in page
+    assert "function goAgent(" in page
+    assert "clipboard" in page  # copies the 定岗定级 query for pasting in Agent
+
+
 def test_hr_template_flow():
     body = _intake()
     r = client.get(f"/api{body['hr_url']}/template")

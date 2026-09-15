@@ -89,6 +89,20 @@ function multi(qid, label) {
   if (i >= 0) cur.splice(i, 1); else cur.push(label);
   answers[qid] = cur;
 }
+// Post-submit jump into the Agent chat to request the grading report. The
+// inline onclick="goAgent(...)" button used to reference an undefined
+// handler (2026-09-15 production: 返回Agent 点击无效). Copies the ready-to-send
+// question to the clipboard (https secure context) and offers a plain link —
+// no timed redirect, which is unreliable on mobile.
+async function goAgent(query, url) {
+  let copied = false;
+  try { await navigator.clipboard.writeText(query); copied = true; } catch (e) {}
+  document.getElementById("app").innerHTML =
+    `<div class="state">✅ 面评已存档，双问卷已齐。<br><br>
+     ${copied ? "问题已复制：<b>" + query + "</b><br>打开 Agent 粘贴发送即可出定岗定级报告。"
+              : "在 Agent 中发送：<b>" + query + "</b> 即可出定岗定级报告。"}<br><br>
+     <a class="primary" href="${url}" style="display:inline-block;padding:10px 18px;">打开 Agent</a></div>`;
+}
 async function submit() {
   const token = location.pathname.split("/h/")[1];
   document.getElementById("err").textContent = "";
