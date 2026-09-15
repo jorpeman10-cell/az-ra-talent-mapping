@@ -1,81 +1,33 @@
 {
- "status": "OK",
- "leveling": {
-  "status": "OK",
-  "grade": "C1",
-  "base_grade": "C2",
-  "effective_billing_wan": 72.0,
-  "verify_coefficient": 0.8,
-  "rationale": [
-   "speed HR score 2.0 < 3: -1 level"
-  ],
-  "warnings": []
- },
  "band": {
+  "confidence": "MEDIUM",
   "p25": 15000,
   "p50": 16000.0,
   "p75": 15000,
-  "source": "internal",
-  "confidence": "MEDIUM"
+  "source": "internal"
  },
- "promotion": {
-  "status": "OK",
-  "current_grade": "C1",
-  "basis": "billing_wan",
-  "window_months": 6,
-  "max_level_jump": 3,
-  "next_grades": [
-   {
-    "grade": "C2",
-    "annual_wan": 70.0,
-    "quarterly_wan": 17.5,
-    "promotion_line_wan": 52.5,
-    "bd_clients_required": 0
-   },
-   {
-    "grade": "SC1",
-    "annual_wan": 80.0,
-    "quarterly_wan": 20.0,
-    "promotion_line_wan": 60.0,
-    "bd_clients_required": 2
-   },
-   {
-    "grade": "SC2",
-    "annual_wan": 90.0,
-    "quarterly_wan": 22.5,
-    "promotion_line_wan": 67.5,
-    "bd_clients_required": 3
-   }
-  ],
-  "progress": null
- },
- "risk": {
-  "cv_prior": 1.08,
-  "cv_sample": null,
-  "concentration": null,
-  "cv_from_concentration": null,
-  "active_clients": null,
-  "top_client_share_pct": null,
-  "cv_used": 1.08,
-  "scenario_billing_factor": {
-   "A_conservative": 0.46,
-   "B_base": 1.0,
-   "C_optimistic": 1.27
-  },
-  "scenario_billing_wan": {
-   "A_conservative": 33.12,
-   "B_base": 72.0,
-   "C_optimistic": 91.44
-  },
-  "npv_scenarios": {
-   "A_conservative": -6.61,
-   "B_base": 66.27,
-   "C_optimistic": 96.41
-  }
- },
- "breakeven_wan": 31.0,
  "breakeven_monthly": 16000.0,
- "npv_quick_at_target": 48.35,
+ "breakeven_wan": 35.0,
+ "confidence": "MEDIUM",
+ "divergence": {
+  "divergent": [
+   "performance",
+   "domain",
+   "speed"
+  ],
+  "high_divergence": true
+ },
+ "leveling": {
+  "base_grade": "C2",
+  "effective_billing_wan": 72.0,
+  "grade": "C1",
+  "rationale": [
+   "speed HR score 2.0 < 3: -1 level"
+  ],
+  "status": "OK",
+  "verify_coefficient": 0.8,
+  "warnings": []
+ },
  "line_match": {
   "lines": [
    {
@@ -118,14 +70,63 @@
   "top_line": "医学线",
   "top_overlap_pct": 100.0
  },
- "divergence": {
-  "divergent": [
-   "performance",
-   "domain",
-   "speed"
+ "npv_quick_at_target": 38.64,
+ "profit_achievement_wan": 61.0,
+ "promotion": {
+  "basis": "billing_wan",
+  "current_grade": "C1",
+  "max_level_jump": 3,
+  "next_grades": [
+   {
+    "annual_wan": 70.0,
+    "bd_clients_required": 0,
+    "grade": "C2",
+    "promotion_line_wan": 52.5,
+    "quarterly_wan": 17.5
+   },
+   {
+    "annual_wan": 80.0,
+    "bd_clients_required": 2,
+    "grade": "SC1",
+    "promotion_line_wan": 60.0,
+    "quarterly_wan": 20.0
+   },
+   {
+    "annual_wan": 90.0,
+    "bd_clients_required": 3,
+    "grade": "SC2",
+    "promotion_line_wan": 67.5,
+    "quarterly_wan": 22.5
+   }
   ],
-  "high_divergence": true
+  "progress": null,
+  "status": "OK",
+  "window_months": 6
  },
- "confidence": "MEDIUM",
+ "risk": {
+  "active_clients": null,
+  "concentration": null,
+  "cv_from_concentration": null,
+  "cv_prior": 1.08,
+  "cv_sample": null,
+  "cv_used": 1.08,
+  "npv_scenarios": {
+   "A_conservative": -13.21,
+   "B_base": 54.89,
+   "C_optimistic": 82.7
+  },
+  "scenario_billing_factor": {
+   "A_conservative": 0.46,
+   "B_base": 1.0,
+   "C_optimistic": 1.27
+  },
+  "scenario_billing_wan": {
+   "A_conservative": 33.12,
+   "B_base": 72.0,
+   "C_optimistic": 91.44
+  },
+  "top_client_share_pct": null
+ },
+ "status": "OK",
  "warnings": []
 }

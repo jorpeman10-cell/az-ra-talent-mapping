@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# Synced from headhunt_model/step7_candidate.py @ P0 (main c4cf532). Service-side fixes go here; port back to keep both green.
 """step7: external consultant candidate assessment engine (deterministic).
 Leveling / salary band / line matching / divergence. No LLM, no network.
 
@@ -173,10 +172,22 @@ def promotion_view(current_grade: str, trailing_billing_wan=None, bd_clients: in
 
 
 # ---------- salary / breakeven ----------
+# 2026-09-16 model revision (Steven ruling): billing is VAT-inclusive —
+# net revenue = X / (1 + VAT_RATE) (price-tax separation, 6%); employer
+# social insurance + housing fund 34% of annual salary; per-head overhead
+# 6.37 wan. TWO thresholds:
+#   breakeven          net revenue = max(salary, commission) + social + overhead
+#   profit-achievement commission = salary*12   ((X/1.06)*tier = salary annual)
+# Commission base is NET billing x ladder tier (replaces the 0.936 factor;
+# pipeline/finance.py keeps the legacy 0.936 for internal payroll — different
+# ledger, untouched).
 
-AFTER_TAX = 0.936            # after-tax coefficient on billing for commission base
+VAT_RATE = 0.06              # VAT on billing: net = X / 1.06
+INSURANCE_PCT = 34.0         # employer social insurance + housing fund (Shanghai, on salary)
+OVERHEAD_WAN = 6.37          # per-head annual overhead (Steven 2026-09-16 confirmed)
 COMMISSION_LADDER = ((40, 0.30), (60, 0.32), (100, 0.35), (150, 0.38), (200, 0.40), (float("inf"), 0.45))
 INTERNAL_ANCHOR_BLEND = 0.6  # 60% internal, 40% market anchor
+MIN_INTERNAL_SAMPLES = 3     # below this the band is anchor-driven (no fake percentiles)
 # Empirical ramp (hunter DB 2026-09-13, 67 billing-attributed advisors):
 # Y1 ≈ 0.60 of mature level, Y2+ ≈ 1.0; median cost-cover quarter = Q3.
 # Applied to the NPV cashflow, never to the discount rate (risk stays in
@@ -191,32 +202,56 @@ def tier(billing_wan: float) -> float:
     return 0.45
 
 
-def _annual_cost_wan(monthly: float, billing_wan: float, insurance_pct: float, overhead_wan: float) -> float:
-    """Total company cost: cash comp = max(base, after-tax billing x tier) + social + overhead."""
+def net_billing(billing_wan: float) -> float:
+    """VAT-exclusive net revenue (price-tax separation, 6%)."""
+    return billing_wan / (1.0 + VAT_RATE)
+
+
+def commission_cash(billing_wan: float) -> float:
+    """Commission entitlement on NET billing at the ladder tier (wan)."""
+    return net_billing(billing_wan) * tier(billing_wan)
+
+
+def _annual_cost_wan(monthly: float, billing_wan: float, insurance_pct: float = INSURANCE_PCT, overhead_wan: float = OVERHEAD_WAN) -> float:
+    """Total company cost: cash comp = max(base, net billing x tier) + social + overhead."""
     base_wan = monthly * 12 / 10000.0
-    cash = max(base_wan, AFTER_TAX * billing_wan * tier(billing_wan))
+    cash = max(base_wan, commission_cash(billing_wan))
     social = base_wan * insurance_pct / 100.0
     return cash + social + overhead_wan
 
 
-def breakeven_billing(monthly: float, insurance_pct: float = 28.0, overhead_wan: float = 6.37) -> float:
-    """Smallest annual billing (wan, step 1) where profit >= 0."""
+def breakeven_billing(monthly: float, insurance_pct: float = INSURANCE_PCT, overhead_wan: float = OVERHEAD_WAN) -> float:
+    """Smallest annual billing (wan, step 1) where VAT-inclusive billing
+    covers full cost: net_billing(B) - _annual_cost_wan(B) >= 0."""
     B = 1.0
     while B < 10000.0:
-        if B - _annual_cost_wan(monthly, B, insurance_pct, overhead_wan) >= 0:
+        if net_billing(B) - _annual_cost_wan(monthly, B, insurance_pct, overhead_wan) >= 0:
+            return round(B, 2)
+        B += 1.0
+    return float("inf")
+
+
+def profit_achievement_billing(monthly: float) -> float:
+    """Smallest annual billing (wan, step 1) where commission fully covers
+    salary: commission_cash(B) >= salary*12 (the bonus-activation line)."""
+    base_wan = monthly * 12 / 10000.0
+    B = 1.0
+    while B < 10000.0:
+        if commission_cash(B) >= base_wan:
             return round(B, 2)
         B += 1.0
     return float("inf")
 
 
 def quick_npv(monthly: float, billing_wan: float, years: int = 3, discount: float = 0.12,
-              insurance_pct: float = 28.0, overhead_wan: float = 6.37) -> float:
-    """Ramp-adjusted 3-year NPV feasibility check (wan). Year factors from
-    RAMP_YEAR_FACTORS (empirical: Y1 0.6x mature, Y2+ 1.0x)."""
+              insurance_pct: float = INSURANCE_PCT, overhead_wan: float = OVERHEAD_WAN) -> float:
+    """Ramp-adjusted 3-year NPV feasibility check (wan, VAT-exclusive net
+    revenue). Year factors from RAMP_YEAR_FACTORS (empirical: Y1 0.6x mature,
+    Y2+ 1.0x)."""
     npv = 0.0
     for y in range(1, years + 1):
         factor = RAMP_YEAR_FACTORS[y - 1] if y <= len(RAMP_YEAR_FACTORS) else 1.0
-        profit = billing_wan * factor - _annual_cost_wan(monthly, billing_wan * factor, insurance_pct, overhead_wan)
+        profit = net_billing(billing_wan * factor) - _annual_cost_wan(monthly, billing_wan * factor, insurance_pct, overhead_wan)
         npv += profit / ((1 + discount) ** y)
     return round(npv, 2)
 
@@ -250,9 +285,16 @@ def salary_band(grade: str, internal_samples: dict, anchors: dict) -> dict:
     if not samples:  # no internal salary data at all (empty grade map)
         return {"p25": None, "p50": None, "p75": None,
                 "source": "no_internal_data", "confidence": "LOW"}
-    p25, p50, p75 = _pct(samples)
-    conf = "MEDIUM" if len(internal_samples.get(grade, [])) >= 2 else "LOW"
+    exact_n = len(internal_samples.get(grade, []))
     anchor = anchors.get(grade)
+    if exact_n < MIN_INTERNAL_SAMPLES and anchor:
+        # Fewer than 3 internal samples cannot form a percentile distribution
+        # (2026-09-15 romona: 1 sample blended into 15060/15060/15460). Use the
+        # benchmark anchor band directly — wide by construction (底薪→全包).
+        return {"p25": anchor["p25"], "p50": anchor["p50"], "p75": anchor["p75"],
+                "source": "anchor", "confidence": "LOW"}
+    p25, p50, p75 = _pct(samples)
+    conf = "MEDIUM" if exact_n >= 2 else "LOW"
     if anchor:
         p25 = round(INTERNAL_ANCHOR_BLEND * p25 + (1 - INTERNAL_ANCHOR_BLEND) * anchor["p25"])
         p50 = round(INTERNAL_ANCHOR_BLEND * p50 + (1 - INTERNAL_ANCHOR_BLEND) * anchor["p50"])
@@ -402,6 +444,7 @@ def assess(bundle: dict) -> dict:
         "promotion": promo,
         "risk": risk,
         "breakeven_wan": breakeven_billing(monthly),
+        "profit_achievement_wan": profit_achievement_billing(monthly),
         "breakeven_monthly": monthly,
         "npv_quick_at_target": quick_npv(monthly, GRADE_TARGETS[GRADE_INDEX[leveling["grade"]]][1]),
         "line_match": lm,

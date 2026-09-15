@@ -1,14 +1,19 @@
 {
- "status": "REJECT_REVIEW",
+ "divergence": {
+  "divergent": [
+   "compliance"
+  ],
+  "high_divergence": false
+ },
  "leveling": {
-  "status": "REJECT_REVIEW",
-  "grade": null,
   "base_grade": null,
   "effective_billing_wan": null,
-  "verify_coefficient": null,
+  "grade": null,
   "rationale": [
    "compliance redline triggered in questionnaire"
   ],
+  "status": "REJECT_REVIEW",
+  "verify_coefficient": null,
   "warnings": []
  },
  "line_match": {
@@ -53,11 +58,6 @@
   "top_line": "医学线",
   "top_overlap_pct": 100.0
  },
- "divergence": {
-  "divergent": [
-   "compliance"
-  ],
-  "high_divergence": false
- },
+ "status": "REJECT_REVIEW",
  "warnings": []
 }

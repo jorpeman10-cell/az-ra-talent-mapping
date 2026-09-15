@@ -1,81 +1,31 @@
 {
- "status": "OK",
- "leveling": {
-  "status": "OK",
-  "grade": "SC1",
-  "base_grade": "C2",
-  "effective_billing_wan": 78.0,
-  "verify_coefficient": 0.65,
-  "rationale": [
-   "domain depth >=4 with top-line overlap 100.0%: +0.5 level"
-  ],
-  "warnings": []
- },
  "band": {
+  "confidence": "MEDIUM",
   "p25": 20000,
   "p50": 21000.0,
   "p75": 20000,
-  "source": "internal",
-  "confidence": "MEDIUM"
+  "source": "internal"
  },
- "promotion": {
-  "status": "OK",
-  "current_grade": "SC1",
-  "basis": "billing_wan",
-  "window_months": 6,
-  "max_level_jump": 3,
-  "next_grades": [
-   {
-    "grade": "SC2",
-    "annual_wan": 90.0,
-    "quarterly_wan": 22.5,
-    "promotion_line_wan": 67.5,
-    "bd_clients_required": 3
-   },
-   {
-    "grade": "PC1",
-    "annual_wan": 100.0,
-    "quarterly_wan": 25.0,
-    "promotion_line_wan": 75.0,
-    "bd_clients_required": 0
-   },
-   {
-    "grade": "PC2",
-    "annual_wan": 110.0,
-    "quarterly_wan": 27.5,
-    "promotion_line_wan": 82.5,
-    "bd_clients_required": 0
-   }
-  ],
-  "progress": null
- },
- "risk": {
-  "cv_prior": 1.08,
-  "cv_sample": null,
-  "concentration": null,
-  "cv_from_concentration": null,
-  "active_clients": null,
-  "top_client_share_pct": null,
-  "cv_used": 1.08,
-  "scenario_billing_factor": {
-   "A_conservative": 0.46,
-   "B_base": 1.0,
-   "C_optimistic": 1.27
-  },
-  "scenario_billing_wan": {
-   "A_conservative": 35.88,
-   "B_base": 78.0,
-   "C_optimistic": 99.06
-  },
-  "npv_scenarios": {
-   "A_conservative": -19.41,
-   "B_base": 66.18,
-   "C_optimistic": 98.83
-  }
- },
- "breakeven_wan": 39.0,
  "breakeven_monthly": 21000.0,
- "npv_quick_at_target": 69.28,
+ "breakeven_wan": 43.0,
+ "confidence": "MEDIUM",
+ "divergence": {
+  "divergent": [
+   "performance"
+  ],
+  "high_divergence": false
+ },
+ "leveling": {
+  "base_grade": "C2",
+  "effective_billing_wan": 78.0,
+  "grade": "SC1",
+  "rationale": [
+   "domain depth >=4 with top-line overlap 100.0%: +0.5 level"
+  ],
+  "status": "OK",
+  "verify_coefficient": 0.65,
+  "warnings": []
+ },
  "line_match": {
   "lines": [
    {
@@ -118,12 +68,63 @@
   "top_line": "医学线",
   "top_overlap_pct": 100.0
  },
- "divergence": {
-  "divergent": [
-   "performance"
+ "npv_quick_at_target": 56.08,
+ "profit_achievement_wan": 77.0,
+ "promotion": {
+  "basis": "billing_wan",
+  "current_grade": "SC1",
+  "max_level_jump": 3,
+  "next_grades": [
+   {
+    "annual_wan": 90.0,
+    "bd_clients_required": 3,
+    "grade": "SC2",
+    "promotion_line_wan": 67.5,
+    "quarterly_wan": 22.5
+   },
+   {
+    "annual_wan": 100.0,
+    "bd_clients_required": 0,
+    "grade": "PC1",
+    "promotion_line_wan": 75.0,
+    "quarterly_wan": 25.0
+   },
+   {
+    "annual_wan": 110.0,
+    "bd_clients_required": 0,
+    "grade": "PC2",
+    "promotion_line_wan": 82.5,
+    "quarterly_wan": 27.5
+   }
   ],
-  "high_divergence": false
+  "progress": null,
+  "status": "OK",
+  "window_months": 6
  },
- "confidence": "MEDIUM",
+ "risk": {
+  "active_clients": null,
+  "concentration": null,
+  "cv_from_concentration": null,
+  "cv_prior": 1.08,
+  "cv_sample": null,
+  "cv_used": 1.08,
+  "npv_scenarios": {
+   "A_conservative": -27.19,
+   "B_base": 53.22,
+   "C_optimistic": 83.35
+  },
+  "scenario_billing_factor": {
+   "A_conservative": 0.46,
+   "B_base": 1.0,
+   "C_optimistic": 1.27
+  },
+  "scenario_billing_wan": {
+   "A_conservative": 35.88,
+   "B_base": 78.0,
+   "C_optimistic": 99.06
+  },
+  "top_client_share_pct": null
+ },
+ "status": "OK",
  "warnings": []
 }
